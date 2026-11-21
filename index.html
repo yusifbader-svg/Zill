@@ -22,18 +22,17 @@
             transform: translateY(0);
         }
 
-        /* نص العروض المتحرك بدون شريط أو صندوق */
+        /* نص العروض المتحرك بنفس لون خلفية الموقع بدون شريط */
         #offers-bar {
             width: 100%;
-            height: 34px;
+            height: 32px;
             overflow: hidden;
             position: relative;
             background-color: #f4f4f4;
-            color: #111111;
+            color: #525252;
             display: none;
             white-space: nowrap;
             direction: ltr;
-            border-bottom: 1px solid #e5e5e5;
             z-index: 45;
         }
         #offers-track {
@@ -54,10 +53,10 @@
             align-items: center;
             flex: 0 0 auto;
             padding: 0 28px;
-            font-size: 12px;
+            font-size: 11.5px;
             font-weight: 600;
             letter-spacing: .2px;
-            color: #111111;
+            color: #404040;
             white-space: nowrap;
             direction: rtl;
         }
@@ -470,6 +469,7 @@
 
                 alert(`تم إرسال طلبك يا ${name}. سنتواصل معك قريباً لتأكيد الطلب.`);
                 cart = [];
+                try { sessionStorage.removeItem('zill_cart_v1'); } catch (e) {}
                 document.getElementById('customer-name').value = '';
                 document.getElementById('customer-phone').value = '';
                 document.getElementById('customer-governorate').value = '0';
@@ -505,7 +505,11 @@
             if (!bar || !track) return;
 
             const validOffers = (Array.isArray(offers) ? offers : [])
-                .filter(item => item && item.active === true && String(item.text || '').trim())
+                .filter(item => {
+                    if (!item || !String(item.text || '').trim()) return false;
+                    const v = item.active;
+                    return v === true || v === 1 || String(v).trim().toLowerCase() === 'true';
+                })
                 .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
 
             activeOffers = validOffers;
@@ -551,8 +555,12 @@
                 ?? product.background
                 ?? '#ffffff';
 
+            const safeId = (product.id !== undefined && product.id !== null && String(product.id).trim() !== '')
+                ? product.id
+                : (product.name || ('item-' + Math.random().toString(36).slice(2, 8)));
+
             return {
-                id: product.id,
+                id: safeId,
                 name: product.name || 'منتج بدون اسم',
                 price: Number(product.price) || 0,
                 old_price: Number(product.old_price) || 0,
@@ -602,7 +610,7 @@
             const container = document.getElementById('categories-container');
             const categories = ['الكل', ...new Set(products.map(p => p.category).filter(Boolean))];
             container.innerHTML = categories.map(cat => `
-                <button onclick="filterCategory(${jsLiteral(cat)})" class="category-btn px-5 py-2 rounded-full text-xs font-semibold ${cat === 'الكل' ? 'bg-black text-white' : 'bg-white text-neutral-800 border border-neutral-300'} transition">
+                <button type="button" data-category="${escapeHTML(cat)}" onclick="filterCategory(${jsLiteral(cat)})" class="category-btn px-5 py-2 rounded-full text-xs font-semibold ${cat === 'الكل' ? 'bg-black text-white' : 'bg-white text-neutral-800 border border-neutral-300'} transition">
                     ${escapeHTML(cat)}
                 </button>
             `).join('');
@@ -611,11 +619,10 @@
         function filterCategory(category) {
             activeCategory = category;
             document.querySelectorAll('.category-btn').forEach(btn => {
-                if (btn.innerText === category) {
-                    btn.className = 'category-btn px-5 py-2 rounded-full text-xs font-semibold bg-black text-white transition';
-                } else {
-                    btn.className = 'category-btn px-5 py-2 rounded-full text-xs font-semibold bg-white text-neutral-800 border border-neutral-300 transition';
-                }
+                const isSelected = (btn.dataset.category ?? btn.innerText) === category;
+                btn.className = isSelected
+                    ? 'category-btn px-5 py-2 rounded-full text-xs font-semibold bg-black text-white transition'
+                    : 'category-btn px-5 py-2 rounded-full text-xs font-semibold bg-white text-neutral-800 border border-neutral-300 transition';
             });
             filterProducts();
         }
@@ -640,11 +647,12 @@
 
             grid.innerHTML = productsToDisplay.map(product => {
                 const imageList = product.images ? product.images.split(',').map(url => url.trim()).filter(Boolean) : [];
-                if (!window.slideIndices[product.id]) window.slideIndices[product.id] = 0;
-                const currentIndex = window.slideIndices[product.id];
+                const slideKey = encodeURIComponent(String(product.id));
+                if (window.slideIndices[slideKey] === undefined) window.slideIndices[slideKey] = 0;
+                const currentIndex = window.slideIndices[slideKey];
                 const bgColor = escapeHTML(product.bg_color || '#ffffff');
                 const imageHTML = imageList.length
-                    ? `<img id="img-${escapeHTML(product.id)}" src="${escapeHTML(imageList[currentIndex] || imageList[0])}" class="w-full h-full object-contain p-2 transition duration-500" alt="${escapeHTML(product.name)}">`
+                    ? `<img id="img-${slideKey}" src="${escapeHTML(imageList[currentIndex] || imageList[0])}" class="w-full h-full object-contain p-2 transition duration-500" alt="${escapeHTML(product.name)}">`
                     : `<div class="w-full h-full flex items-center justify-center text-neutral-400 text-xs">الصورة غير متاحة</div>`;
 
                 const priceHTML = product.old_price > product.price
@@ -655,7 +663,7 @@
                     : `<span class="font-bold text-sm">${product.price} EGP</span>`;
 
                 return `
-                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-neutral-200/60 flex flex-col justify-between">
+                    <div data-product-card="${slideKey}" class="bg-white p-6 rounded-2xl shadow-sm border border-neutral-200/60 flex flex-col justify-between">
                         <div class="relative w-full h-72 rounded-xl overflow-hidden mb-4 group border border-neutral-100" style="background-color: ${bgColor};">
                             ${imageHTML}
                             ${imageList.length > 1 ? `
@@ -728,7 +736,7 @@
                 return;
             }
             main.innerHTML = `<img src="${escapeHTML(images[selectedDetailImage] || images[0])}" class="w-full h-full object-contain p-3" alt="${escapeHTML(selectedDetailProduct.name)}">`;
-            thumbs.innerHTML = images.map((url, index) => `<button onclick="selectDetailImage(${index})" class="w-16 h-20 flex-shrink-0 rounded-lg overflow-hidden border-2 ${index === selectedDetailImage ? 'border-black' : 'border-transparent'}" style="background-color: ${bgColor};"><img src="${escapeHTML(url)}" class="w-full h-full object-contain p-1"></button>`).join('');
+            thumbs.innerHTML = images.map((url, index) => `<button type="button" onclick="selectDetailImage(${index})" class="w-16 h-20 flex-shrink-0 rounded-lg overflow-hidden border-2 ${index === selectedDetailImage ? 'border-black' : 'border-transparent'}" style="background-color: ${bgColor};"><img src="${escapeHTML(url)}" class="w-full h-full object-contain p-1"></button>`).join('');
         }
 
         function selectDetailImage(index) {
@@ -779,15 +787,22 @@
 
         function changeSlide(productId, direction) {
             const product = allProducts.find(item => String(item.id) === String(productId));
-            if (!product || !product.images) return;
-            const images = product.images.split(',').map(url => url.trim()).filter(Boolean);
+            if (!product) return;
+            const images = getProductImages(product);
             if (images.length < 2) return;
-            if (window.slideIndices[productId] === undefined) window.slideIndices[productId] = 0;
-            window.slideIndices[productId] += direction;
-            if (window.slideIndices[productId] >= images.length) window.slideIndices[productId] = 0;
-            if (window.slideIndices[productId] < 0) window.slideIndices[productId] = images.length - 1;
-            const image = document.getElementById(`img-${CSS.escape(String(productId))}`);
-            if (image) image.src = images[window.slideIndices[productId]];
+            const slideKey = encodeURIComponent(String(product.id));
+            if (window.slideIndices[slideKey] === undefined) window.slideIndices[slideKey] = 0;
+            window.slideIndices[slideKey] += direction;
+            if (window.slideIndices[slideKey] >= images.length) window.slideIndices[slideKey] = 0;
+            if (window.slideIndices[slideKey] < 0) window.slideIndices[slideKey] = images.length - 1;
+            const nextSrc = images[window.slideIndices[slideKey]];
+            const image = document.getElementById(`img-${slideKey}`);
+            if (image) {
+                image.src = nextSrc;
+            } else {
+                const container = document.querySelector(`[data-product-card="${slideKey}"] img`);
+                if (container) container.src = nextSrc;
+            }
         }
 
 
