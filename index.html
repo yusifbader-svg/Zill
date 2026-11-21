@@ -138,7 +138,7 @@
     </header>
 
     <!-- شريط الأقسام -->
-    <nav class="max-w-6xl mx-auto px-6 mt-8 flex gap-3 overflow-x-auto pb-2" id="categories-container">
+    <nav class="relative z-20 max-w-6xl mx-auto px-6 mt-8 flex gap-3 overflow-x-auto pb-2" id="categories-container">
         <button type="button" onclick="filterCategory('الكل')" class="category-btn active px-5 py-2 rounded-full text-xs font-semibold bg-black text-white transition">الكل</button>
     </nav>
 
@@ -295,12 +295,16 @@
         function skipIntro() {
             clearTimeout(introTimer);
             const screen = document.getElementById('intro-screen');
+            if (!screen) return;
+            screen.style.pointerEvents = 'none';
             screen.style.opacity = '0';
             setTimeout(() => { screen.style.display = 'none'; }, 1000);
         }
         function replayIntro() {
             const screen = document.getElementById('intro-screen');
+            if (!screen) return;
             screen.style.display = 'flex';
+            screen.style.pointerEvents = 'auto';
             setTimeout(() => { screen.style.opacity = '1'; }, 50);
             startIntroSequence();
         }
@@ -670,10 +674,18 @@
             });
 
             container.innerHTML = merged.map(cat => `
-                <button type="button" data-direct-handled="1" data-category="${escapeHTML(cat)}" onclick="filterCategory(${jsLiteral(cat)})" class="category-btn px-5 py-2 rounded-full text-xs font-semibold ${cat === 'الكل' ? 'bg-black text-white' : 'bg-white text-neutral-800 border border-neutral-300'} transition">
+                <button type="button" data-category="${escapeHTML(cat)}" class="category-btn relative z-20 cursor-pointer px-5 py-2 rounded-full text-xs font-semibold ${cat === 'الكل' ? 'bg-black text-white' : 'bg-white text-neutral-800 border border-neutral-300'} transition">
                     ${escapeHTML(cat)}
                 </button>
             `).join('');
+
+            container.querySelectorAll('.category-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const catName = btn.dataset.category || btn.textContent.trim();
+                    filterCategory(catName);
+                });
+            });
         }
 
         function filterCategory(category) {
@@ -900,6 +912,13 @@
                 sessionStorage.setItem(introSeenKey, '1');
             }
 
+            const initAllBtn = document.querySelector('#categories-container .category-btn');
+            if (initAllBtn) {
+                initAllBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    filterCategory('الكل');
+                });
+            }
             updateCartUI();
             fetchProducts();
         };
