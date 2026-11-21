@@ -17,6 +17,16 @@
             transform: translateY(10px);
             transition: opacity 1s ease, transform 1s ease;
         }
+
+        .slide-img {
+            transition: opacity 0.24s ease, transform 0.24s ease;
+            will-change: opacity, transform;
+        }
+        .slide-img.is-swapping {
+            opacity: 0.15;
+            transform: scale(0.97);
+        }
+
         .fade-text.active {
             opacity: 1;
             transform: translateY(0);
@@ -129,7 +139,7 @@
 
     <!-- شريط الأقسام -->
     <nav class="max-w-6xl mx-auto px-6 mt-8 flex gap-3 overflow-x-auto pb-2" id="categories-container">
-        <button onclick="filterCategory('الكل')" class="category-btn active px-5 py-2 rounded-full text-xs font-semibold bg-black text-white transition">الكل</button>
+        <button type="button" onclick="filterCategory('الكل')" class="category-btn active px-5 py-2 rounded-full text-xs font-semibold bg-black text-white transition">الكل</button>
     </nav>
 
     <!-- المنتجات -->
@@ -566,7 +576,7 @@
                 old_price: Number(product.old_price) || 0,
                 sizes: product.sizes || '',
                 stock_alert: product.stock_alert || '',
-                category: product.category || 'Hoodies',
+                category: String(product.category || 'Hoodies').trim() || 'Hoodies',
                 images: images.join(','),
                 bg_color: sanitizeBgColor(rawBg),
                 description: product.description || ''
@@ -586,23 +596,39 @@
             updateCartUI();
         }
 
+        function applyStoreData(data) {
+            allProducts = (Array.isArray(data.products) ? data.products : []).map(normalizeProduct);
+            populateShipping(data.shipping);
+            setupCategories(allProducts);
+            renderOffersBar(data.offers);
+            filterProducts();
+        }
+
         async function fetchProducts() {
             const grid = document.getElementById('products-grid');
+            const cacheKey = 'zill_store_cache_v1';
+            try {
+                const cachedRaw = sessionStorage.getItem(cacheKey);
+                if (cachedRaw) {
+                    const cachedData = JSON.parse(cachedRaw);
+                    if (cachedData && Array.isArray(cachedData.products)) {
+                        applyStoreData(cachedData);
+                    }
+                }
+            } catch (e) {}
+
             try {
                 const response = await fetch(WEB_APP_URL);
                 if (!response.ok) throw new Error('HTTP ' + response.status);
                 const data = await response.json();
-
-                allProducts = (Array.isArray(data.products) ? data.products : []).map(normalizeProduct);
-                populateShipping(data.shipping);
-                setupCategories(allProducts);
-                renderOffersBar(data.offers);
-                displayProducts(allProducts);
+                try { sessionStorage.setItem(cacheKey, JSON.stringify(data)); } catch (e) {}
+                applyStoreData(data);
             } catch (error) {
                 console.error('خطأ في جلب بيانات Google Sheets:', error);
-                allProducts = [];
-                setupCategories(allProducts);
-                grid.innerHTML = `<p class="col-span-3 text-center text-neutral-400 py-12">تعذر تحميل المنتجات من المتجر. حاول تحديث الصفحة بعد قليل.</p>`;
+                if (!allProducts.length) {
+                    setupCategories(allProducts);
+                    grid.innerHTML = `<p class="col-span-3 text-center text-neutral-400 py-12">تعذر تحميل المنتجات من المتجر. حاول تحديث الصفحة بعد قليل.</p>`;
+                }
             }
         }
 
@@ -610,16 +636,19 @@
             const container = document.getElementById('categories-container');
             const categories = ['الكل', ...new Set(products.map(p => p.category).filter(Boolean))];
             container.innerHTML = categories.map(cat => `
-                <button type="button" data-category="${escapeHTML(cat)}" onclick="filterCategory(${jsLiteral(cat)})" class="category-btn px-5 py-2 rounded-full text-xs font-semibold ${cat === 'الكل' ? 'bg-black text-white' : 'bg-white text-neutral-800 border border-neutral-300'} transition">
+                <button type="button" data-direct-handled="1" data-category="${escapeHTML(cat)}" onclick="filterCategory(${jsLiteral(cat)})" class="category-btn px-5 py-2 rounded-full text-xs font-semibold ${cat === 'الكل' ? 'bg-black text-white' : 'bg-white text-neutral-800 border border-neutral-300'} transition">
                     ${escapeHTML(cat)}
                 </button>
             `).join('');
         }
 
         function filterCategory(category) {
-            activeCategory = category;
+            const cleanCat = String(category ?? 'الكل').trim() || 'الكل';
+            activeCategory = cleanCat;
+            const targetNorm = cleanCat.toLowerCase();
             document.querySelectorAll('.category-btn').forEach(btn => {
-                const isSelected = (btn.dataset.category ?? btn.innerText) === category;
+                const btnVal = String(btn.dataset.category ?? btn.innerText ?? '').trim().toLowerCase();
+                const isSelected = btnVal === targetNorm;
                 btn.className = isSelected
                     ? 'category-btn px-5 py-2 rounded-full text-xs font-semibold bg-black text-white transition'
                     : 'category-btn px-5 py-2 rounded-full text-xs font-semibold bg-white text-neutral-800 border border-neutral-300 transition';
@@ -628,10 +657,12 @@
         }
 
         function filterProducts() {
-            const searchText = document.getElementById('search-input').value.toLowerCase().trim();
+            const searchText = (document.getElementById('search-input')?.value || '').toLowerCase().trim();
+            const selectedCat = String(activeCategory || 'الكل').trim().toLowerCase();
             const filtered = allProducts.filter(product => {
-                const matchesCat = activeCategory === 'الكل' || product.category === activeCategory;
-                const matchesSearch = String(product.name).toLowerCase().includes(searchText)
+                const prodCat = String(product.category || '').trim().toLowerCase();
+                const matchesCat = selectedCat === 'الكل' || prodCat === selectedCat;
+                const matchesSearch = String(product.name || '').toLowerCase().includes(searchText)
                     || String(product.description || '').toLowerCase().includes(searchText);
                 return matchesCat && matchesSearch;
             });
@@ -641,7 +672,7 @@
         function displayProducts(productsToDisplay) {
             const grid = document.getElementById('products-grid');
             if (productsToDisplay.length === 0) {
-                grid.innerHTML = `<p class="col-span-3 text-center text-neutral-400 py-12">لا توجد منتجات مطابقة للبحث.</p>`;
+                grid.innerHTML = `<p class="col-span-3 text-center text-neutral-400 py-12">لا توجد منتجات مطابقة للبحث أو القسم المختار.</p>`;
                 return;
             }
 
@@ -652,7 +683,7 @@
                 const currentIndex = window.slideIndices[slideKey];
                 const bgColor = escapeHTML(product.bg_color || '#ffffff');
                 const imageHTML = imageList.length
-                    ? `<img id="img-${slideKey}" src="${escapeHTML(imageList[currentIndex] || imageList[0])}" class="w-full h-full object-contain p-2 transition duration-500" alt="${escapeHTML(product.name)}">`
+                    ? `<img id="img-${slideKey}" src="${escapeHTML(imageList[currentIndex] || imageList[0])}" loading="lazy" decoding="async" class="slide-img w-full h-full object-contain p-2" alt="${escapeHTML(product.name)}">`
                     : `<div class="w-full h-full flex items-center justify-center text-neutral-400 text-xs">الصورة غير متاحة</div>`;
 
                 const priceHTML = product.old_price > product.price
@@ -796,12 +827,15 @@
             if (window.slideIndices[slideKey] >= images.length) window.slideIndices[slideKey] = 0;
             if (window.slideIndices[slideKey] < 0) window.slideIndices[slideKey] = images.length - 1;
             const nextSrc = images[window.slideIndices[slideKey]];
-            const image = document.getElementById(`img-${slideKey}`);
+            const image = document.getElementById(`img-${slideKey}`)
+                || document.querySelector(`[data-product-card="${slideKey}"] img`);
             if (image) {
-                image.src = nextSrc;
-            } else {
-                const container = document.querySelector(`[data-product-card="${slideKey}"] img`);
-                if (container) container.src = nextSrc;
+                image.classList.add('is-swapping');
+                setTimeout(() => {
+                    image.src = nextSrc;
+                    image.onload = () => image.classList.remove('is-swapping');
+                    setTimeout(() => image.classList.remove('is-swapping'), 180);
+                }, 110);
             }
         }
 
