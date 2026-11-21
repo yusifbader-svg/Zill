@@ -220,10 +220,14 @@
                 </div>
             </div>
 
-            <div class="border-t pt-4 mt-4 space-y-1">
+            <div class="border-t pt-4 mt-4 space-y-1.5">
                 <div class="flex justify-between text-xs text-neutral-500">
                     <span>قيمة المنتجات:</span>
                     <span id="products-subtotal">0 EGP</span>
+                </div>
+                <div id="discount-row" class="hidden justify-between text-xs text-emerald-700 font-semibold">
+                    <span id="discount-label">الخصم:</span>
+                    <span id="discount-amount">-0 EGP</span>
                 </div>
                 <div class="flex justify-between text-xs text-neutral-500">
                     <span>سعر الشحن:</span>
@@ -233,6 +237,16 @@
                     <span>الإجمالي الكلي:</span>
                     <span id="cart-total">0 EGP</span>
                 </div>
+
+                <div class="pt-3 mt-2 border-t border-neutral-100">
+                    <label for="promo-code-input" class="block text-xs text-neutral-500 mb-1.5">كود الخصم (اختياري)</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="promo-code-input" onkeydown="if(event.key==='Enter'){event.preventDefault();applyPromoCode();}" oninput="onPromoInputChange()" class="flex-1 bg-neutral-50 border border-neutral-300 rounded-lg px-3 py-2 text-xs uppercase focus:outline-none focus:border-black" placeholder="اكتب كود الخصم هنا...">
+                        <button type="button" id="apply-promo-btn" onclick="applyPromoCode()" class="bg-neutral-900 text-white px-4 py-2 rounded-lg text-xs font-semibold hover:bg-neutral-700 transition shrink-0">تطبيق</button>
+                    </div>
+                    <p id="promo-status-msg" class="text-[11px] mt-1.5 hidden"></p>
+                </div>
+
                 <button onclick="confirmOrder()" class="w-full bg-black text-white py-3 mt-3 rounded-xl text-xs font-semibold tracking-wider hover:bg-neutral-800 transition">
                     تأكيد الاوردر ✅
                 </button>
@@ -318,6 +332,124 @@
             cart = [];
         }
         let shippingOptions = [];
+        let promoCodesList = [];
+        let appliedPromo = null;
+
+        function parseDiscountPercent(rawVal) {
+            if (rawVal === undefined || rawVal === null) return 0;
+            const cleaned = String(rawVal).replace('%', '').trim();
+            if (!cleaned) return 0;
+            const num = parseFloat(cleaned);
+            if (!Number.isFinite(num) || num <= 0) return 0;
+            if (num > 0 && num < 1) return Math.min(100, num * 100);
+            return Math.min(100, num);
+        }
+
+        function extractPromoCodes(data) {
+            const rawList = data?.promo_codes
+                || data?.promocodes
+                || data?.promoCodes
+                || data?.coupons
+                || data?.discounts
+                || data?.codes
+                || [];
+            if (!Array.isArray(rawList)) return [];
+            return rawList
+                .map(row => {
+                    if (!row) return null;
+                    if (Array.isArray(row)) {
+                        const code = String(row[0] || '').trim();
+                        const pct = parseDiscountPercent(row[1]);
+                        const activeRaw = row[2];
+                        const isInactive = activeRaw !== undefined && activeRaw !== '' &&
+                            ['false', 'off', 'inactive', '0', 'no', 'لا'].includes(String(activeRaw).trim().toLowerCase());
+                        if (!code || pct <= 0 || isInactive) return null;
+                        return { code, percent: pct };
+                    }
+                    if (typeof row === 'object') {
+                        const code = String(row.code ?? row.promo ?? row.promo_code ?? row.coupon ?? row.name ?? '').trim();
+                        const pct = parseDiscountPercent(
+                            row.discount ?? row.percent ?? row.percentage ?? row.off ?? row.rate ?? row.value ?? ''
+                        );
+                        const activeRaw = row.active ?? row.status ?? row.enabled ?? '';
+                        const isInactive = activeRaw !== '' &&
+                            ['false', 'off', 'inactive', 'disabled', '0', 'no', 'لا'].includes(String(activeRaw).trim().toLowerCase());
+                        if (!code || pct <= 0 || isInactive) return null;
+                        return { code, percent: pct };
+                    }
+                    return null;
+                })
+                .filter(Boolean);
+        }
+
+        function showPromoMessage(text, isSuccess) {
+            const el = document.getElementById('promo-status-msg');
+            if (!el) return;
+            if (!text) {
+                el.textContent = '';
+                el.classList.add('hidden');
+                return;
+            }
+            el.textContent = text;
+            el.className = `text-[11px] mt-1.5 font-semibold ${isSuccess ? 'text-emerald-700' : 'text-red-500'}`;
+            el.classList.remove('hidden');
+        }
+
+        function onPromoInputChange() {
+            const input = document.getElementById('promo-code-input');
+            const typed = String(input?.value || '').trim().toLowerCase();
+            if (appliedPromo && appliedPromo.code.toLowerCase() !== typed) {
+                appliedPromo = null;
+                showPromoMessage('', false);
+                updateCartUI();
+            } else if (!typed) {
+                appliedPromo = null;
+                showPromoMessage('', false);
+                updateCartUI();
+            }
+        }
+
+        function applyPromoCode() {
+            const input = document.getElementById('promo-code-input');
+            const rawCode = String(input?.value || '').trim();
+            if (!rawCode) {
+                appliedPromo = null;
+                showPromoMessage('اكتب كود الخصم الأول أو سيب الخانة فاضية وأكد الاوردر عادي.', false);
+                updateCartUI();
+                return;
+            }
+
+            const matched = promoCodesList.find(item => item.code.toLowerCase() === rawCode.toLowerCase());
+            if (!matched) {
+                appliedPromo = null;
+                showPromoMessage('كود الخصم غير صحيح أو غير متاح.', false);
+                updateCartUI();
+                return;
+            }
+
+            appliedPromo = { code: matched.code, percent: matched.percent };
+            showPromoMessage(`تم تطبيق كود (${matched.code}) بخصم ${matched.percent}%`, true);
+            updateCartUI();
+        }
+
+        function calculateOrderTotals() {
+            const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+            const discountPercent = appliedPromo ? (Number(appliedPromo.percent) || 0) : 0;
+            const discountAmount = subtotal > 0 && discountPercent > 0
+                ? Math.round((subtotal * discountPercent) / 100)
+                : 0;
+            const discountedSubtotal = Math.max(0, subtotal - discountAmount);
+            const shippingFee = getShippingFee();
+            const total = discountedSubtotal + shippingFee;
+            return {
+                subtotal,
+                discountPercent,
+                discountAmount,
+                discountedSubtotal,
+                shippingFee,
+                total
+            };
+        }
 
         function addToCart(id, name, price, size) {
             if (!size) { alert('من فضلك اختار المقاس الأول.'); return; }
@@ -367,15 +499,24 @@
             document.getElementById('cart-count').innerText = cart.reduce((sum, item) => sum + item.quantity, 0);
             const container = document.getElementById('cart-items-container');
 
+            const discountRow = document.getElementById('discount-row');
+            const discountLabel = document.getElementById('discount-label');
+            const discountAmountEl = document.getElementById('discount-amount');
+
             if (cart.length === 0) {
+                appliedPromo = null;
+                showPromoMessage('', false);
                 container.innerHTML = `<p class="text-center text-neutral-400 py-6 text-xs">سلة الطلبات فارغة حالياً.</p>`;
                 document.getElementById('products-subtotal').innerText = '0 EGP';
+                if (discountRow) {
+                    discountRow.classList.add('hidden');
+                    discountRow.classList.remove('flex');
+                }
                 document.getElementById('shipping-cost').innerText = '0 EGP';
                 document.getElementById('cart-total').innerText = '0 EGP';
                 return;
             }
 
-            const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
             container.innerHTML = cart.map((item, index) => `
                 <div class="py-2.5 flex justify-between items-center gap-3 text-xs">
                     <div class="min-w-0 flex-1">
@@ -386,10 +527,21 @@
                 </div>
             `).join('');
 
-            const shippingFee = getShippingFee();
-            document.getElementById('products-subtotal').innerText = subtotal + ' EGP';
-            document.getElementById('shipping-cost').innerText = shippingFee + ' EGP';
-            document.getElementById('cart-total').innerText = (subtotal + shippingFee) + ' EGP';
+            const totals = calculateOrderTotals();
+            document.getElementById('products-subtotal').innerText = totals.subtotal + ' EGP';
+            if (discountRow && discountLabel && discountAmountEl) {
+                if (appliedPromo && totals.discountAmount > 0) {
+                    discountLabel.textContent = `الخصم (${appliedPromo.code} - ${appliedPromo.percent}%):`;
+                    discountAmountEl.textContent = `-${totals.discountAmount} EGP`;
+                    discountRow.classList.remove('hidden');
+                    discountRow.classList.add('flex');
+                } else {
+                    discountRow.classList.add('hidden');
+                    discountRow.classList.remove('flex');
+                }
+            }
+            document.getElementById('shipping-cost').innerText = totals.shippingFee + ' EGP';
+            document.getElementById('cart-total').innerText = totals.total + ' EGP';
         }
 
         function jsLiteral(value) {
@@ -449,9 +601,20 @@
                 return;
             }
 
-            const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-            const shipping = getShippingFee();
-            const total = subtotal + shipping;
+            const promoInputEl = document.getElementById('promo-code-input');
+            const rawPromoTyped = String(promoInputEl?.value || '').trim();
+            if (rawPromoTyped && (!appliedPromo || appliedPromo.code.toLowerCase() !== rawPromoTyped.toLowerCase())) {
+                const matchedPromo = promoCodesList.find(item => item.code.toLowerCase() === rawPromoTyped.toLowerCase());
+                if (matchedPromo) {
+                    appliedPromo = { code: matchedPromo.code, percent: matchedPromo.percent };
+                    showPromoMessage(`تم تطبيق كود (${matchedPromo.code}) بخصم ${matchedPromo.percent}%`, true);
+                } else {
+                    alert('كود الخصم المكتوب غير صحيح. عدّله أو امسحه لتأكيد الطلب بدون خصم.');
+                    return;
+                }
+            }
+
+            const totals = calculateOrderTotals();
             const orderItems = cart.map(item => ({
                 id: item.id,
                 name: item.name,
@@ -476,18 +639,31 @@
                         phone: phone,
                         governorate: governorateName,
                         address: address,
-                        items: JSON.stringify({ products: orderItems, subtotal: subtotal, shipping: shipping }),
-                        total: total
+                        promo_code: appliedPromo ? appliedPromo.code : '',
+                        discount_percent: appliedPromo ? appliedPromo.percent : 0,
+                        discount_amount: totals.discountAmount,
+                        items: JSON.stringify({
+                            products: orderItems,
+                            subtotal: totals.subtotal,
+                            promo_code: appliedPromo ? appliedPromo.code : '',
+                            discount_percent: appliedPromo ? appliedPromo.percent : 0,
+                            discount_amount: totals.discountAmount,
+                            shipping: totals.shippingFee
+                        }),
+                        total: totals.total
                     })
                 });
 
                 alert(`تم إرسال طلبك يا ${name}. سنتواصل معك قريباً لتأكيد الطلب.`);
                 cart = [];
+                appliedPromo = null;
                 try { sessionStorage.removeItem('zill_cart_v1'); } catch (e) {}
                 document.getElementById('customer-name').value = '';
                 document.getElementById('customer-phone').value = '';
                 document.getElementById('customer-governorate').value = '0';
                 document.getElementById('customer-address').value = '';
+                if (promoInputEl) promoInputEl.value = '';
+                showPromoMessage('', false);
                 updateCartUI();
                 const cartModal = document.getElementById('cart-modal'); cartModal.classList.add('hidden'); cartModal.classList.remove('flex');
             } catch (error) {
@@ -679,10 +855,21 @@
                 activeCategory = 'All';
             }
 
+            promoCodesList = extractPromoCodes(data);
             setupCategories(allProducts, sheetCats, hasCategoriesTab);
             filterProducts();
             populateShipping(data.shipping);
             renderOffersBar(data.offers);
+            if (appliedPromo) {
+                const stillValid = promoCodesList.find(item => item.code.toLowerCase() === appliedPromo.code.toLowerCase());
+                if (stillValid) {
+                    appliedPromo = { code: stillValid.code, percent: stillValid.percent };
+                } else {
+                    appliedPromo = null;
+                    showPromoMessage('', false);
+                }
+                updateCartUI();
+            }
         }
 
         async function fetchProducts() {
