@@ -551,6 +551,28 @@
             return Math.min(100, num);
         }
 
+        function parseOptionalLimitNumber(rawVal) {
+            if (rawVal === undefined || rawVal === null || String(rawVal).trim() === '') return null;
+            const num = Number(String(rawVal).trim());
+            if (!Number.isFinite(num) || num <= 0) return null;
+            return Math.floor(num);
+        }
+
+        function parseUsedCountNumber(rawVal) {
+            if (rawVal === undefined || rawVal === null || String(rawVal).trim() === '') return 0;
+            const num = Number(String(rawVal).trim());
+            if (!Number.isFinite(num) || num < 0) return 0;
+            return Math.floor(num);
+        }
+
+        function isPromoExhausted(promoItem) {
+            if (!promoItem) return false;
+            if (promoItem.maxUses !== null && promoItem.maxUses !== undefined && promoItem.maxUses > 0) {
+                return (Number(promoItem.usedCount) || 0) >= promoItem.maxUses;
+            }
+            return false;
+        }
+
         function extractPromoCodes(data) {
             const rawList = data?.promo_codes
                 || data?.promocodes
@@ -570,7 +592,9 @@
                         const isInactive = activeRaw !== undefined && activeRaw !== '' &&
                             ['false', 'off', 'inactive', '0', 'no', 'لا'].includes(String(activeRaw).trim().toLowerCase());
                         if (!code || pct <= 0 || isInactive) return null;
-                        return { code, percent: pct };
+                        const maxUses = parseOptionalLimitNumber(row[3]);
+                        const usedCount = parseUsedCountNumber(row[4]);
+                        return { code, percent: pct, maxUses, usedCount };
                     }
                     if (typeof row === 'object') {
                         const code = String(row.code ?? row.promo ?? row.promo_code ?? row.coupon ?? row.name ?? '').trim();
@@ -581,7 +605,13 @@
                         const isInactive = activeRaw !== '' &&
                             ['false', 'off', 'inactive', 'disabled', '0', 'no', 'لا'].includes(String(activeRaw).trim().toLowerCase());
                         if (!code || pct <= 0 || isInactive) return null;
-                        return { code, percent: pct };
+                        const maxUses = parseOptionalLimitNumber(
+                            row.max_uses ?? row.maxUses ?? row.usage_limit ?? row.limit ?? row.max_count ?? ''
+                        );
+                        const usedCount = parseUsedCountNumber(
+                            row.used_count ?? row.usedCount ?? row.uses ?? row.used ?? 0
+                        );
+                        return { code, percent: pct, maxUses, usedCount };
                     }
                     return null;
                 })
@@ -633,8 +663,23 @@
                 return;
             }
 
-            appliedPromo = { code: matched.code, percent: matched.percent };
-            showPromoMessage(`تم تطبيق كود (${matched.code}) بخصم ${matched.percent}%`, true);
+            if (isPromoExhausted(matched)) {
+                appliedPromo = null;
+                showPromoMessage('تم انتهاء عدد مرات الاستخدام المسموح بها لهذا الكود.', false);
+                updateCartUI();
+                return;
+            }
+
+            appliedPromo = {
+                code: matched.code,
+                percent: matched.percent,
+                maxUses: matched.maxUses,
+                usedCount: matched.usedCount
+            };
+            const remainingText = (matched.maxUses !== null && matched.maxUses > 0)
+                ? ` (متبقي ${Math.max(0, matched.maxUses - matched.usedCount)} استخدام)`
+                : '';
+            showPromoMessage(`تم تطبيق كود (${matched.code}) بخصم ${matched.percent}%${remainingText}`, true);
             updateCartUI();
         }
 
@@ -851,7 +896,17 @@
             if (rawPromoTyped && (!appliedPromo || appliedPromo.code.toLowerCase() !== rawPromoTyped.toLowerCase())) {
                 const matchedPromo = promoCodesList.find(item => item.code.toLowerCase() === rawPromoTyped.toLowerCase());
                 if (matchedPromo) {
-                    appliedPromo = { code: matchedPromo.code, percent: matchedPromo.percent };
+                    if (isPromoExhausted(matchedPromo)) {
+                        appliedPromo = null;
+                        alert('تم انتهاء عدد مرات الاستخدام المسموح بها لهذا الكود.');
+                        return;
+                    }
+                    appliedPromo = {
+                        code: matchedPromo.code,
+                        percent: matchedPromo.percent,
+                        maxUses: matchedPromo.maxUses,
+                        usedCount: matchedPromo.usedCount
+                    };
                     showPromoMessage(`تم تطبيق كود (${matchedPromo.code}) بخصم ${matchedPromo.percent}%`, true);
                 } else {
                     alert('كود الخصم المكتوب غير صحيح. عدّله أو امسحه لتأكيد الطلب بدون خصم.');
@@ -901,6 +956,12 @@
                     })
                 });
 
+                if (appliedPromo) {
+                    const usedItem = promoCodesList.find(p => p.code.toLowerCase() === appliedPromo.code.toLowerCase());
+                    if (usedItem) {
+                        usedItem.usedCount = (Number(usedItem.usedCount) || 0) + 1;
+                    }
+                }
                 alert(`تم إرسال طلبك يا ${name}. سنتواصل معك قريباً لتأكيد الطلب.`);
                 cart = [];
                 appliedPromo = null;
@@ -1109,11 +1170,16 @@
             renderOffersBar(data.offers);
             if (appliedPromo) {
                 const stillValid = promoCodesList.find(item => item.code.toLowerCase() === appliedPromo.code.toLowerCase());
-                if (stillValid) {
-                    appliedPromo = { code: stillValid.code, percent: stillValid.percent };
+                if (stillValid && !isPromoExhausted(stillValid)) {
+                    appliedPromo = {
+                        code: stillValid.code,
+                        percent: stillValid.percent,
+                        maxUses: stillValid.maxUses,
+                        usedCount: stillValid.usedCount
+                    };
                 } else {
                     appliedPromo = null;
-                    showPromoMessage('', false);
+                    showPromoMessage(stillValid ? 'تم انتهاء عدد مرات الاستخدام المسموح بها لهذا الكود.' : '', false);
                 }
                 updateCartUI();
             }
