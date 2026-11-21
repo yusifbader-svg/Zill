@@ -596,10 +596,30 @@
             updateCartUI();
         }
 
+        function extractSheetCategories(rawCategories) {
+            if (!Array.isArray(rawCategories)) return [];
+            return rawCategories
+                .map(row => {
+                    if (!row) return null;
+                    if (typeof row === 'string') {
+                        const name = row.trim();
+                        return name && name.toLowerCase() !== 'hoodies' ? { name, active: true } : null;
+                    }
+                    const name = String(row.category ?? row.name ?? row.title ?? row.Hoodies ?? '').trim();
+                    const state = String(row.state ?? row.status ?? '').trim().toLowerCase();
+                    if (!name) return null;
+                    if (name.toLowerCase() === 'hoodies' && !state) return null;
+                    const isComingSoon = state === 'coming soon' || state === 'inactive' || state === 'false';
+                    return { name, active: !isComingSoon };
+                })
+                .filter(item => item && item.name);
+        }
+
         function applyStoreData(data) {
             allProducts = (Array.isArray(data.products) ? data.products : []).map(normalizeProduct);
             populateShipping(data.shipping);
-            setupCategories(allProducts);
+            const sheetCats = extractSheetCategories(data.categories);
+            setupCategories(allProducts, sheetCats);
             renderOffersBar(data.offers);
             filterProducts();
         }
@@ -632,10 +652,24 @@
             }
         }
 
-        function setupCategories(products) {
+        function setupCategories(products, sheetCategories = []) {
             const container = document.getElementById('categories-container');
-            const categories = ['الكل', ...new Set(products.map(p => p.category).filter(Boolean))];
-            container.innerHTML = categories.map(cat => `
+            const productCats = products.map(p => String(p.category || '').trim()).filter(Boolean);
+            const merged = ['الكل'];
+
+            sheetCategories.forEach(item => {
+                if (!merged.some(existing => existing.toLowerCase() === item.name.toLowerCase())) {
+                    merged.push(item.name);
+                }
+            });
+
+            productCats.forEach(cat => {
+                if (!merged.some(existing => existing.toLowerCase() === cat.toLowerCase())) {
+                    merged.push(cat);
+                }
+            });
+
+            container.innerHTML = merged.map(cat => `
                 <button type="button" data-direct-handled="1" data-category="${escapeHTML(cat)}" onclick="filterCategory(${jsLiteral(cat)})" class="category-btn px-5 py-2 rounded-full text-xs font-semibold ${cat === 'الكل' ? 'bg-black text-white' : 'bg-white text-neutral-800 border border-neutral-300'} transition">
                     ${escapeHTML(cat)}
                 </button>
