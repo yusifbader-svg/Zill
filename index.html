@@ -623,7 +623,9 @@
                     if (!row) return null;
                     if (typeof row === 'string') {
                         const name = row.trim();
-                        if (!name || name.toLowerCase() === 'hoodies') return null;
+                        if (!name || ['category', 'categories', 'القسم', 'التصنيف', 'الأقسام', 'التصنيفات'].includes(name.toLowerCase())) {
+                            return null;
+                        }
                         return { name, mode: 'active' };
                     }
                     const rawState = String(row.state ?? row.status ?? row.State ?? row.Status ?? '').trim();
@@ -632,13 +634,12 @@
                         const keys = Object.keys(row).filter(k => !['state', 'status'].includes(k.toLowerCase()));
                         if (keys.length) {
                             const candidate = String(row[keys[0]] ?? '').trim();
-                            if (candidate && !(candidate.toLowerCase() === 'hoodies' && !rawState)) {
+                            if (candidate && !['category', 'categories', 'القسم', 'التصنيف', 'الأقسام', 'التصنيفات'].includes(candidate.toLowerCase())) {
                                 name = candidate;
                             }
                         }
                     }
                     if (!name) return null;
-                    if (name.toLowerCase() === 'hoodies' && !rawState) return null;
                     return { name, mode: parseCategoryStatus(rawState) };
                 })
                 .filter(item => item && item.name);
@@ -667,7 +668,8 @@
 
         function applyStoreData(data) {
             allProducts = (Array.isArray(data.products) ? data.products : []).map(normalizeProduct);
-            const sheetCats = extractSheetCategories(data.categories);
+            const hasCategoriesTab = Array.isArray(data.categories);
+            const sheetCats = hasCategoriesTab ? extractSheetCategories(data.categories) : [];
             categoryStatesMap = {};
             sheetCats.forEach(item => {
                 categoryStatesMap[item.name.toLowerCase()] = item.mode;
@@ -677,7 +679,7 @@
                 activeCategory = 'All';
             }
 
-            setupCategories(allProducts, sheetCats);
+            setupCategories(allProducts, sheetCats, hasCategoriesTab);
             filterProducts();
             populateShipping(data.shipping);
             renderOffersBar(data.offers);
@@ -701,6 +703,10 @@
                 clearTimeout(timeoutId);
                 if (!response.ok) throw new Error('HTTP ' + response.status);
                 const data = await response.json();
+                try {
+                    sessionStorage.removeItem('zill_store_cache_v1');
+                    localStorage.removeItem('zill_store_cache_v1');
+                } catch (e) {}
                 writeCachedStore(data);
                 applyStoreData(data);
             } catch (error) {
@@ -713,7 +719,7 @@
             }
         }
 
-        function setupCategories(products, sheetCategories = []) {
+        function setupCategories(products, sheetCategories = [], hasCategoriesTab = false) {
             const container = document.getElementById('categories-container');
             if (!container) return;
             const productCats = products.map(p => String(p.category || '').trim()).filter(Boolean);
