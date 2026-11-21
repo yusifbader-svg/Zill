@@ -112,14 +112,14 @@
     </div>
 
     <!-- الهيدر الرئيسي -->
-    <header class="w-full px-4 sm:px-8 py-3.5 sm:py-5 flex justify-between items-center gap-2 sm:gap-4 border-b border-neutral-200 bg-[#f4f4f4]/90 backdrop-blur-md sticky top-0 z-40">
+    <header class="w-full px-5 md:px-8 py-4 md:py-6 flex justify-between items-center gap-3 border-b border-neutral-200 bg-[#f4f4f4]/80 backdrop-blur-md sticky top-0 z-40">
         <div class="flex flex-col items-start shrink-0">
             <span class="brand-font text-lg sm:text-xl font-bold tracking-tight text-black">ظل</span>
             <span class="brand-font text-[8px] sm:text-[9px] tracking-[0.25em] sm:tracking-[0.3em] text-neutral-500 uppercase -mt-1">zill</span>
         </div>
         
         <div class="flex items-center gap-2 sm:gap-4 min-w-0">
-            <input type="text" id="search-input" oninput="filterProducts()" placeholder="ابحث عن قطعة..." class="bg-white border border-neutral-300 rounded-full px-3 sm:px-4 py-1.5 text-[11px] sm:text-xs focus:outline-none focus:border-black transition w-28 sm:w-48 md:w-64 min-w-0">
+            <input type="text" id="search-input" oninput="filterProducts()" placeholder="ابحث عن قطعة..." class="bg-white border border-neutral-300 rounded-full px-4 py-1.5 text-xs focus:outline-none focus:border-black transition w-36 sm:w-52 md:w-64">
             
             <button onclick="toggleCartModal()" class="relative text-[11px] sm:text-xs tracking-wider text-neutral-800 hover:text-black px-3 sm:px-5 py-1.5 sm:py-2 rounded-full border border-neutral-300 hover:border-black transition flex items-center gap-1.5 sm:gap-2 shrink-0">
                 <span>السلة</span>
@@ -133,18 +133,18 @@
     </header>
 
     <!-- شريط العروض أسفل الهيدر الرئيسي -->
-    <div id="offers-bar" aria-label="العروض" class="border-b border-neutral-200/70">
+    <div id="offers-bar" aria-label="العروض">
         <div id="offers-track"></div>
     </div>
 
     <!-- شريط الأقسام -->
-    <nav class="relative z-20 max-w-6xl mx-auto px-4 sm:px-6 mt-4 sm:mt-8 flex gap-2 sm:gap-3 overflow-x-auto pb-2" id="categories-container">
+    <nav class="relative z-20 max-w-6xl mx-auto px-5 md:px-6 mt-6 md:mt-8 flex gap-2.5 md:gap-3 overflow-x-auto pb-2" id="categories-container">
         <button type="button" onclick="filterCategory('All')" class="category-btn active shrink-0 whitespace-nowrap px-4 sm:px-5 py-1.5 sm:py-2 rounded-full text-[11px] sm:text-xs font-semibold bg-black text-white transition">All</button>
     </nav>
 
     <!-- المنتجات -->
-    <main class="max-w-6xl mx-auto px-4 sm:px-6 py-5 sm:py-8 w-full flex-grow">
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-8" id="products-grid"></div>
+    <main class="max-w-6xl mx-auto px-5 md:px-6 py-6 md:py-8 w-full flex-grow">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8" id="products-grid"></div>
     </main>
 
     <!-- صفحة تفاصيل المنتج -->
@@ -607,7 +607,7 @@
             if (['false', 'off', 'out', 'out of stock', 'hidden', 'disable', 'disabled', '0', 'no'].includes(st)) {
                 return 'hidden';
             }
-            if (['coming soon', 'soon', 'coming', 'قريبا', 'قريباً'].includes(st)) {
+            if (st.includes('soon') || st.includes('coming') || st.includes('قريب')) {
                 return 'coming_soon';
             }
             if (['active', 'true', 'on', 'available', 'open', '1', 'yes'].includes(st)) {
@@ -626,8 +626,17 @@
                         if (!name || name.toLowerCase() === 'hoodies') return null;
                         return { name, mode: 'active' };
                     }
-                    const name = String(row.category ?? row.name ?? row.title ?? row.Hoodies ?? '').trim();
-                    const rawState = String(row.state ?? row.status ?? '').trim();
+                    const rawState = String(row.state ?? row.status ?? row.State ?? row.Status ?? '').trim();
+                    let name = String(row.category ?? row.name ?? row.title ?? row.Category ?? row.Name ?? '').trim();
+                    if (!name) {
+                        const keys = Object.keys(row).filter(k => !['state', 'status'].includes(k.toLowerCase()));
+                        if (keys.length) {
+                            const candidate = String(row[keys[0]] ?? '').trim();
+                            if (candidate && !(candidate.toLowerCase() === 'hoodies' && !rawState)) {
+                                name = candidate;
+                            }
+                        }
+                    }
                     if (!name) return null;
                     if (name.toLowerCase() === 'hoodies' && !rawState) return null;
                     return { name, mode: parseCategoryStatus(rawState) };
@@ -729,7 +738,7 @@
             container.innerHTML = merged.map(cat => {
                 const isSelected = String(cat).trim().toLowerCase() === activeNorm;
                 return `
-                    <button type="button" data-category="${escapeHTML(cat)}" class="category-btn shrink-0 whitespace-nowrap relative z-20 cursor-pointer px-4 sm:px-5 py-1.5 sm:py-2 rounded-full text-[11px] sm:text-xs font-semibold ${isSelected ? 'bg-black text-white' : 'bg-white text-neutral-800 border border-neutral-300'} transition">
+                    <button type="button" data-category="${escapeHTML(cat)}" class="category-btn shrink-0 whitespace-nowrap relative z-20 cursor-pointer px-5 py-2 rounded-full text-xs font-semibold ${isSelected ? 'bg-black text-white' : 'bg-white text-neutral-800 border border-neutral-300'} transition">
                         ${escapeHTML(cat)}
                     </button>
                 `;
@@ -755,8 +764,8 @@
                 const btnVal = String(btn.dataset.category ?? btn.innerText ?? '').trim().toLowerCase();
                 const isSelected = btnVal === targetNorm;
                 btn.className = isSelected
-                    ? 'category-btn shrink-0 whitespace-nowrap px-4 sm:px-5 py-1.5 sm:py-2 rounded-full text-[11px] sm:text-xs font-semibold bg-black text-white transition'
-                    : 'category-btn shrink-0 whitespace-nowrap px-4 sm:px-5 py-1.5 sm:py-2 rounded-full text-[11px] sm:text-xs font-semibold bg-white text-neutral-800 border border-neutral-300 transition';
+                    ? 'category-btn shrink-0 whitespace-nowrap px-5 py-2 rounded-full text-xs font-semibold bg-black text-white transition'
+                    : 'category-btn shrink-0 whitespace-nowrap px-5 py-2 rounded-full text-xs font-semibold bg-white text-neutral-800 border border-neutral-300 transition';
             });
             filterProducts();
         }
@@ -768,7 +777,7 @@
             if (selectedCat !== 'all' && categoryStatesMap[selectedCat] === 'coming_soon' && !searchText) {
                 const grid = document.getElementById('products-grid');
                 if (grid) {
-                    grid.innerHTML = `<p class="col-span-full text-center text-neutral-500 py-14 text-sm font-semibold">هذا القسم سيتوفر قريباً</p>`;
+                    grid.innerHTML = `<p class="col-span-full text-center text-neutral-500 py-14 text-sm font-semibold">هيتوفر قريباً</p>`;
                 }
                 return;
             }
@@ -789,7 +798,7 @@
             if (productsToDisplay.length === 0) {
                 const selectedCat = String(activeCategory || 'All').trim().toLowerCase();
                 const msg = (selectedCat !== 'all' && categoryStatesMap[selectedCat] === 'coming_soon')
-                    ? 'هذا القسم سيتوفر قريباً'
+                    ? 'هيتوفر قريباً'
                     : 'لا توجد منتجات مطابقة للبحث أو القسم المختار.';
                 grid.innerHTML = `<p class="col-span-full text-center text-neutral-400 py-12">${msg}</p>`;
                 return;
@@ -813,8 +822,8 @@
                     : `<span class="font-bold text-sm">${product.price} EGP</span>`;
 
                 return `
-                    <div data-product-card="${slideKey}" class="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-neutral-200/60 flex flex-col justify-between">
-                        <div class="relative w-full h-56 sm:h-72 rounded-xl overflow-hidden mb-4 group border border-neutral-100" style="background-color: ${bgColor};">
+                    <div data-product-card="${slideKey}" class="bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-neutral-200/60 flex flex-col justify-between">
+                        <div class="relative w-full h-64 md:h-72 rounded-xl overflow-hidden mb-4 group border border-neutral-100" style="background-color: ${bgColor};">
                             ${imageHTML}
                             ${imageList.length > 1 ? `
                                 <button onclick='changeSlide(${jsLiteral(product.id)}, -1)' class="absolute left-2 top-1/2 -translate-y-1/2 bg-white/85 hover:bg-white px-2 py-1 rounded-full text-xs shadow transition">❮</button>
