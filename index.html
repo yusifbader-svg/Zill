@@ -88,6 +88,7 @@
             to { transform: translate3d(-50%, 0, 0); }
         }
     </style>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body class="bg-[#f4f4f4] text-neutral-900 min-h-screen flex flex-col justify-between">
 
@@ -124,6 +125,14 @@
             <button onclick="toggleCartModal()" class="relative text-[11px] sm:text-xs tracking-wider text-neutral-800 hover:text-black px-3 sm:px-5 py-1.5 sm:py-2 rounded-full border border-neutral-300 hover:border-black transition flex items-center gap-1.5 sm:gap-2 shrink-0">
                 <span>السلة</span>
                 <span id="cart-count" class="bg-black text-white text-[10px] px-1.5 py-0.5 rounded-full">0</span>
+            </button>
+
+            <button type="button" id="account-btn" onclick="toggleAccountModal()" title="الحساب" aria-label="الحساب" class="relative text-[11px] sm:text-xs tracking-wider text-neutral-800 hover:text-black px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-full border border-neutral-300 hover:border-black transition flex items-center gap-1.5 shrink-0 bg-white">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+                <span id="account-btn-label" class="hidden sm:inline max-w-[90px] truncate">حسابي</span>
             </button>
 
             <button onclick="replayIntro()" class="text-xs tracking-wider text-neutral-600 hover:text-black px-3 py-2 rounded-full border border-neutral-200 transition hidden md:block">
@@ -203,7 +212,7 @@
                 </div>
                 <div>
                     <label class="block text-xs text-neutral-500 mb-1">رقم الهاتف</label>
-                    <input type="text" id="customer-phone" class="w-full bg-neutral-50 border border-neutral-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-black" placeholder="01xxxxxxxxx">
+                    <input type="tel" id="customer-phone" inputmode="numeric" pattern="[0-9]*" maxlength="11" oninput="sanitizePhoneInput(this)" class="w-full bg-neutral-50 border border-neutral-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-black" placeholder="01xxxxxxxxx">
                 </div>
                 <div>
                     <label class="block text-xs text-neutral-500 mb-1">المحافظة (تحديد سعر الشحن تلقائياً)</label>
@@ -249,6 +258,38 @@
 
                 <button onclick="confirmOrder()" class="w-full bg-black text-white py-3 mt-3 rounded-xl text-xs font-semibold tracking-wider hover:bg-neutral-800 transition">
                     تأكيد الاوردر ✅
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة تسجيل الدخول بحساب جوجل -->
+    <div id="account-modal" class="fixed inset-0 z-[75] bg-black/50 backdrop-blur-sm hidden items-center justify-center p-4" onclick="if(event.target===this) toggleAccountModal()">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative space-y-4">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 class="brand-font text-base font-bold">حساب العميل</h3>
+                <button type="button" onclick="toggleAccountModal()" class="text-neutral-500 hover:text-black text-sm px-2 py-1">✕ إغلاق</button>
+            </div>
+
+            <div id="account-logged-out" class="space-y-4 text-center py-2">
+                <p class="text-xs text-neutral-600 leading-6">
+                    سجّل دخولك بحساب Google بضغطة واحدة بدون إدخال باسورد ليصلك جديد العروض على إيميلك.
+                </p>
+                <div class="flex justify-center" id="google-signin-button-container"></div>
+                <p id="google-signin-hint" class="text-[11px] text-neutral-400 leading-5"></p>
+            </div>
+
+            <div id="account-logged-in" class="hidden space-y-4">
+                <div class="flex items-center gap-3 bg-neutral-50 p-3 rounded-xl border border-neutral-100">
+                    <img id="account-avatar" src="" alt="" class="w-12 h-12 rounded-full object-cover bg-neutral-200 hidden">
+                    <div class="min-w-0 flex-1">
+                        <p id="account-name" class="text-sm font-bold text-neutral-900 truncate"></p>
+                        <p id="account-email" class="text-xs text-neutral-500 truncate" dir="ltr"></p>
+                    </div>
+                </div>
+                <p id="account-sync-status" class="text-[11px] text-emerald-700 font-semibold"></p>
+                <button type="button" onclick="signOutGoogleAccount()" class="w-full border border-neutral-300 text-neutral-700 hover:border-black hover:text-black py-2.5 rounded-xl text-xs font-semibold transition">
+                    تسجيل الخروج
                 </button>
             </div>
         </div>
@@ -321,6 +362,171 @@
             screen.style.pointerEvents = 'auto';
             setTimeout(() => { screen.style.opacity = '1'; }, 50);
             startIntroSequence();
+        }
+
+        // --- حساب العميل عبر Google Sign-In ---
+        // ضع Client ID الخاص بمشروعك في Google Cloud Console هنا:
+        const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
+        const CUSTOMER_STORAGE_KEY = 'zill_google_customer_v1';
+        let currentCustomer = null;
+
+        try {
+            const savedCust = JSON.parse(sessionStorage.getItem(CUSTOMER_STORAGE_KEY) || localStorage.getItem(CUSTOMER_STORAGE_KEY) || 'null');
+            if (savedCust && savedCust.email) currentCustomer = savedCust;
+        } catch (e) {
+            currentCustomer = null;
+        }
+
+        function decodeJwtPayload(token) {
+            try {
+                const parts = String(token || '').split('.');
+                if (parts.length !== 3) return null;
+                const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+                const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+                const binary = atob(padded);
+                const bytes = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+                const jsonStr = new TextDecoder().decode(bytes);
+                return JSON.parse(jsonStr);
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function updateAccountUI(syncMessage = '') {
+            const btnLabel = document.getElementById('account-btn-label');
+            const loggedOutBox = document.getElementById('account-logged-out');
+            const loggedInBox = document.getElementById('account-logged-in');
+            const avatarEl = document.getElementById('account-avatar');
+            const nameEl = document.getElementById('account-name');
+            const emailEl = document.getElementById('account-email');
+            const statusEl = document.getElementById('account-sync-status');
+
+            if (currentCustomer && currentCustomer.email) {
+                if (btnLabel) btnLabel.textContent = currentCustomer.name || 'حسابي';
+                if (loggedOutBox) loggedOutBox.classList.add('hidden');
+                if (loggedInBox) loggedInBox.classList.remove('hidden');
+                if (nameEl) nameEl.textContent = currentCustomer.name || 'عميل ZILL';
+                if (emailEl) emailEl.textContent = currentCustomer.email;
+                if (avatarEl) {
+                    if (currentCustomer.picture) {
+                        avatarEl.src = currentCustomer.picture;
+                        avatarEl.classList.remove('hidden');
+                    } else {
+                        avatarEl.classList.add('hidden');
+                    }
+                }
+                if (statusEl) {
+                    statusEl.textContent = syncMessage || 'تم تسجيل حسابك لاستقبال العروض على الإيميل ✅';
+                }
+
+                const custNameInput = document.getElementById('customer-name');
+                if (custNameInput && !custNameInput.value.trim() && currentCustomer.name) {
+                    custNameInput.value = currentCustomer.name;
+                }
+            } else {
+                if (btnLabel) btnLabel.textContent = 'حسابي';
+                if (loggedOutBox) loggedOutBox.classList.remove('hidden');
+                if (loggedInBox) loggedInBox.classList.add('hidden');
+            }
+        }
+
+        async function saveCustomerToSheet(customer) {
+            if (!customer || !customer.email) return;
+            try {
+                await fetch(WEB_APP_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({
+                        action: 'register_customer',
+                        name: customer.name || '',
+                        email: customer.email,
+                        picture: customer.picture || '',
+                        google_id: customer.sub || ''
+                    })
+                });
+                updateAccountUI('تم حفظ إيميلك في قائمة العروض بنجاح ✅');
+            } catch (err) {
+                console.error('Customer save error:', err);
+            }
+        }
+
+        function handleGoogleCredentialResponse(response) {
+            const payload = decodeJwtPayload(response?.credential);
+            if (!payload || !payload.email) {
+                alert('تعذر قراءة بيانات حساب Google.');
+                return;
+            }
+            currentCustomer = {
+                sub: payload.sub || '',
+                name: payload.name || '',
+                email: String(payload.email || '').trim().toLowerCase(),
+                picture: payload.picture || ''
+            };
+            try {
+                const serialized = JSON.stringify(currentCustomer);
+                sessionStorage.setItem(CUSTOMER_STORAGE_KEY, serialized);
+                localStorage.setItem(CUSTOMER_STORAGE_KEY, serialized);
+            } catch (e) {}
+            updateAccountUI('جاري تسجيل حسابك...');
+            saveCustomerToSheet(currentCustomer);
+        }
+
+        function initGoogleSignIn() {
+            const container = document.getElementById('google-signin-button-container');
+            const hint = document.getElementById('google-signin-hint');
+            if (!container) return;
+
+            const hasValidClientId = GOOGLE_CLIENT_ID
+                && !GOOGLE_CLIENT_ID.includes('YOUR_GOOGLE_CLIENT_ID');
+
+            if (!hasValidClientId) {
+                if (hint) {
+                    hint.textContent = 'ملاحظة للمطور: ضع GOOGLE_CLIENT_ID الخاص بك من Google Cloud Console داخل الكود لتفعيل زر دخول Google.';
+                }
+                return;
+            }
+
+            if (window.google && window.google.accounts && window.google.accounts.id) {
+                window.google.accounts.id.initialize({
+                    client_id: GOOGLE_CLIENT_ID,
+                    callback: handleGoogleCredentialResponse
+                });
+                container.innerHTML = '';
+                window.google.accounts.id.renderButton(container, {
+                    theme: 'outline',
+                    size: 'large',
+                    text: 'signin_with',
+                    shape: 'pill',
+                    width: 260
+                });
+            }
+        }
+
+        function signOutGoogleAccount() {
+            currentCustomer = null;
+            try {
+                sessionStorage.removeItem(CUSTOMER_STORAGE_KEY);
+                localStorage.removeItem(CUSTOMER_STORAGE_KEY);
+            } catch (e) {}
+            if (window.google && window.google.accounts && window.google.accounts.id) {
+                window.google.accounts.id.disableAutoSelect();
+            }
+            updateAccountUI('');
+            initGoogleSignIn();
+        }
+
+        function toggleAccountModal() {
+            const modal = document.getElementById('account-modal');
+            if (!modal) return;
+            const willOpen = modal.classList.contains('hidden');
+            modal.classList.toggle('hidden', !willOpen);
+            modal.classList.toggle('flex', willOpen);
+            if (willOpen) {
+                updateAccountUI();
+                initGoogleSignIn();
+            }
         }
 
         // --- السلة والطلب ---
@@ -432,17 +638,29 @@
             updateCartUI();
         }
 
+        function getItemDiscountUnitPrice(item) {
+            const prodObj = allProducts.find(p => String(p.id) === String(item.id));
+            const oldPrice = Number(item.old_price ?? prodObj?.old_price ?? 0) || 0;
+            const currentPrice = Number(item.price) || 0;
+            return oldPrice > 0 ? oldPrice : currentPrice;
+        }
+
         function calculateOrderTotals() {
-            const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+            const subtotal = cart.reduce((sum, item) => sum + (Number(item.price) || 0) * item.quantity, 0);
+            const discountBaseSubtotal = cart.reduce(
+                (sum, item) => sum + getItemDiscountUnitPrice(item) * item.quantity,
+                0
+            );
             const discountPercent = appliedPromo ? (Number(appliedPromo.percent) || 0) : 0;
-            const discountAmount = subtotal > 0 && discountPercent > 0
-                ? Math.round((subtotal * discountPercent) / 100)
+            const discountAmount = discountBaseSubtotal > 0 && discountPercent > 0
+                ? Math.round((discountBaseSubtotal * discountPercent) / 100)
                 : 0;
             const discountedSubtotal = Math.max(0, subtotal - discountAmount);
             const shippingFee = getShippingFee();
             const total = discountedSubtotal + shippingFee;
             return {
                 subtotal,
+                discountBaseSubtotal,
                 discountPercent,
                 discountAmount,
                 discountedSubtotal,
@@ -453,11 +671,23 @@
 
         function addToCart(id, name, price, size) {
             if (!size) { alert('من فضلك اختار المقاس الأول.'); return; }
+            const prodObj = allProducts.find(p => String(p.id) === String(id));
+            const oldPriceVal = Number(prodObj?.old_price) || 0;
             let existingItem = cart.find(item => String(item.id) === String(id) && item.size === size);
             if (existingItem) {
                 existingItem.quantity += 1;
+                if (oldPriceVal > 0 && !(Number(existingItem.old_price) > 0)) {
+                    existingItem.old_price = oldPriceVal;
+                }
             } else {
-                cart.push({ id, name, price: parseFloat(price) || 0, size, quantity: 1 });
+                cart.push({
+                    id,
+                    name,
+                    price: parseFloat(price) || 0,
+                    old_price: oldPriceVal,
+                    size,
+                    quantity: 1
+                });
             }
             updateCartUI();
             closeProductDetails();
@@ -582,6 +812,14 @@
             if (willOpen) updateCartUI();
         }
 
+        function sanitizePhoneInput(inputEl) {
+            if (!inputEl) return;
+            const digitsOnly = String(inputEl.value || '').replace(/[^0-9]/g, '').slice(0, 11);
+            if (inputEl.value !== digitsOnly) {
+                inputEl.value = digitsOnly;
+            }
+        }
+
         async function confirmOrder() {
             if (cart.length === 0) {
                 alert('السلة فارغة!');
@@ -598,6 +836,13 @@
 
             if (!name || !phone || gov === '0' || !address) {
                 alert('يرجى ملء كافة بيانات الشحن واختيار المحافظة.');
+                return;
+            }
+
+            const cleanPhone = phone.replace(/[^0-9]/g, '');
+            if (cleanPhone.length !== 11) {
+                alert('في مشكلة في رقم الهاتف: يجب أن يتكون من 11 رقماً.');
+                document.getElementById('customer-phone')?.focus();
                 return;
             }
 
@@ -636,15 +881,17 @@
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                     body: JSON.stringify({
                         customer_name: name,
-                        phone: phone,
+                        phone: cleanPhone,
                         governorate: governorateName,
                         address: address,
                         promo_code: appliedPromo ? appliedPromo.code : '',
                         discount_percent: appliedPromo ? appliedPromo.percent : 0,
                         discount_amount: totals.discountAmount,
+                        discount_base_subtotal: totals.discountBaseSubtotal,
                         items: JSON.stringify({
                             products: orderItems,
                             subtotal: totals.subtotal,
+                            discount_base_subtotal: totals.discountBaseSubtotal,
                             promo_code: appliedPromo ? appliedPromo.code : '',
                             discount_percent: appliedPromo ? appliedPromo.percent : 0,
                             discount_amount: totals.discountAmount,
@@ -1170,6 +1417,11 @@
                     cartModal.classList.add('hidden');
                     cartModal.classList.remove('flex');
                 }
+                const accountModal = document.getElementById('account-modal');
+                if (accountModal && !accountModal.classList.contains('hidden')) {
+                    accountModal.classList.add('hidden');
+                    accountModal.classList.remove('flex');
+                }
             }
         });
 
@@ -1194,6 +1446,8 @@
                     filterCategory('All');
                 });
             }
+            updateAccountUI();
+            initGoogleSignIn();
             updateCartUI();
             fetchProducts();
         };
