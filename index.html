@@ -111,22 +111,17 @@
         <div></div>
     </div>
 
-    <!-- شريط العروض - يتحكم فيه Google Sheets / OffersBar -->
-    <div id="offers-bar" aria-label="العروض">
-        <div id="offers-track"></div>
-    </div>
-
     <!-- الهيدر الرئيسي -->
-    <header class="w-full px-8 py-6 flex justify-between items-center border-b border-neutral-200 bg-[#f4f4f4]/80 backdrop-blur-md sticky top-0 z-40">
-        <div class="flex flex-col items-start">
-            <span class="brand-font text-xl font-bold tracking-tight text-black">ظل</span>
-            <span class="brand-font text-[9px] tracking-[0.3em] text-neutral-500 uppercase -mt-1">zill</span>
+    <header class="w-full px-4 sm:px-8 py-3.5 sm:py-5 flex justify-between items-center gap-2 sm:gap-4 border-b border-neutral-200 bg-[#f4f4f4]/90 backdrop-blur-md sticky top-0 z-40">
+        <div class="flex flex-col items-start shrink-0">
+            <span class="brand-font text-lg sm:text-xl font-bold tracking-tight text-black">ظل</span>
+            <span class="brand-font text-[8px] sm:text-[9px] tracking-[0.25em] sm:tracking-[0.3em] text-neutral-500 uppercase -mt-1">zill</span>
         </div>
         
-        <div class="flex items-center gap-4">
-            <input type="text" id="search-input" oninput="filterProducts()" placeholder="ابحث عن قطعة..." class="bg-white border border-neutral-300 rounded-full px-4 py-1.5 text-xs focus:outline-none focus:border-black transition w-40 md:w-64">
+        <div class="flex items-center gap-2 sm:gap-4 min-w-0">
+            <input type="text" id="search-input" oninput="filterProducts()" placeholder="ابحث عن قطعة..." class="bg-white border border-neutral-300 rounded-full px-3 sm:px-4 py-1.5 text-[11px] sm:text-xs focus:outline-none focus:border-black transition w-28 sm:w-48 md:w-64 min-w-0">
             
-            <button onclick="toggleCartModal()" class="relative text-xs tracking-wider text-neutral-800 hover:text-black px-5 py-2 rounded-full border border-neutral-300 hover:border-black transition flex items-center gap-2">
+            <button onclick="toggleCartModal()" class="relative text-[11px] sm:text-xs tracking-wider text-neutral-800 hover:text-black px-3 sm:px-5 py-1.5 sm:py-2 rounded-full border border-neutral-300 hover:border-black transition flex items-center gap-1.5 sm:gap-2 shrink-0">
                 <span>السلة</span>
                 <span id="cart-count" class="bg-black text-white text-[10px] px-1.5 py-0.5 rounded-full">0</span>
             </button>
@@ -137,14 +132,19 @@
         </div>
     </header>
 
+    <!-- شريط العروض أسفل الهيدر الرئيسي -->
+    <div id="offers-bar" aria-label="العروض" class="border-b border-neutral-200/70">
+        <div id="offers-track"></div>
+    </div>
+
     <!-- شريط الأقسام -->
-    <nav class="relative z-20 max-w-6xl mx-auto px-6 mt-8 flex gap-3 overflow-x-auto pb-2" id="categories-container">
-        <button type="button" onclick="filterCategory('الكل')" class="category-btn active px-5 py-2 rounded-full text-xs font-semibold bg-black text-white transition">الكل</button>
+    <nav class="relative z-20 max-w-6xl mx-auto px-4 sm:px-6 mt-4 sm:mt-8 flex gap-2 sm:gap-3 overflow-x-auto pb-2" id="categories-container">
+        <button type="button" onclick="filterCategory('All')" class="category-btn active shrink-0 whitespace-nowrap px-4 sm:px-5 py-1.5 sm:py-2 rounded-full text-[11px] sm:text-xs font-semibold bg-black text-white transition">All</button>
     </nav>
 
     <!-- المنتجات -->
-    <main class="max-w-6xl mx-auto px-6 py-8 w-full flex-grow">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8" id="products-grid"></div>
+    <main class="max-w-6xl mx-auto px-4 sm:px-6 py-5 sm:py-8 w-full flex-grow">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-8" id="products-grid"></div>
     </main>
 
     <!-- صفحة تفاصيل المنتج -->
@@ -504,7 +504,8 @@
         // --- ربط Google Sheets ---
         const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzDxwMRuOJk8QnRQfOekAJ0H313yC59pyUlb3FV9oZjQAR775_aoHAaRl34PkNsv1Tk/exec';
         let allProducts = [];
-        let activeCategory = 'الكل';
+        let activeCategory = 'All';
+        let categoryStatesMap = {};
         let activeOffers = [];
         window.slideIndices = {};
 
@@ -600,6 +601,21 @@
             updateCartUI();
         }
 
+        function parseCategoryStatus(rawState) {
+            const st = String(rawState || '').trim().toLowerCase();
+            if (!st) return 'active';
+            if (['false', 'off', 'out', 'out of stock', 'hidden', 'disable', 'disabled', '0', 'no'].includes(st)) {
+                return 'hidden';
+            }
+            if (['coming soon', 'soon', 'coming', 'قريبا', 'قريباً'].includes(st)) {
+                return 'coming_soon';
+            }
+            if (['active', 'true', 'on', 'available', 'open', '1', 'yes'].includes(st)) {
+                return 'active';
+            }
+            return 'active';
+        }
+
         function extractSheetCategories(rawCategories) {
             if (!Array.isArray(rawCategories)) return [];
             return rawCategories
@@ -607,49 +623,81 @@
                     if (!row) return null;
                     if (typeof row === 'string') {
                         const name = row.trim();
-                        return name && name.toLowerCase() !== 'hoodies' ? { name, active: true } : null;
+                        if (!name || name.toLowerCase() === 'hoodies') return null;
+                        return { name, mode: 'active' };
                     }
                     const name = String(row.category ?? row.name ?? row.title ?? row.Hoodies ?? '').trim();
-                    const state = String(row.state ?? row.status ?? '').trim().toLowerCase();
+                    const rawState = String(row.state ?? row.status ?? '').trim();
                     if (!name) return null;
-                    if (name.toLowerCase() === 'hoodies' && !state) return null;
-                    const isComingSoon = state === 'coming soon' || state === 'inactive' || state === 'false';
-                    return { name, active: !isComingSoon };
+                    if (name.toLowerCase() === 'hoodies' && !rawState) return null;
+                    return { name, mode: parseCategoryStatus(rawState) };
                 })
                 .filter(item => item && item.name);
         }
 
+        function readCachedStore() {
+            const cacheKey = 'zill_store_cache_v1';
+            for (const store of [sessionStorage, localStorage]) {
+                try {
+                    const raw = store.getItem(cacheKey);
+                    if (raw) {
+                        const parsed = JSON.parse(raw);
+                        if (parsed && Array.isArray(parsed.products)) return parsed;
+                    }
+                } catch (e) {}
+            }
+            return null;
+        }
+
+        function writeCachedStore(data) {
+            const cacheKey = 'zill_store_cache_v1';
+            const serialized = JSON.stringify(data);
+            try { sessionStorage.setItem(cacheKey, serialized); } catch (e) {}
+            try { localStorage.setItem(cacheKey, serialized); } catch (e) {}
+        }
+
         function applyStoreData(data) {
             allProducts = (Array.isArray(data.products) ? data.products : []).map(normalizeProduct);
-            populateShipping(data.shipping);
             const sheetCats = extractSheetCategories(data.categories);
+            categoryStatesMap = {};
+            sheetCats.forEach(item => {
+                categoryStatesMap[item.name.toLowerCase()] = item.mode;
+            });
+
+            if (activeCategory.toLowerCase() !== 'all' && categoryStatesMap[activeCategory.toLowerCase()] === 'hidden') {
+                activeCategory = 'All';
+            }
+
             setupCategories(allProducts, sheetCats);
-            renderOffersBar(data.offers);
             filterProducts();
+            populateShipping(data.shipping);
+            renderOffersBar(data.offers);
         }
 
         async function fetchProducts() {
             const grid = document.getElementById('products-grid');
-            const cacheKey = 'zill_store_cache_v1';
-            try {
-                const cachedRaw = sessionStorage.getItem(cacheKey);
-                if (cachedRaw) {
-                    const cachedData = JSON.parse(cachedRaw);
-                    if (cachedData && Array.isArray(cachedData.products)) {
-                        applyStoreData(cachedData);
-                    }
-                }
-            } catch (e) {}
+            const cachedData = readCachedStore();
+            if (cachedData) {
+                applyStoreData(cachedData);
+            }
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 9000);
 
             try {
-                const response = await fetch(WEB_APP_URL);
+                const response = await fetch(`${WEB_APP_URL}?t=${Date.now()}`, {
+                    signal: controller.signal,
+                    cache: 'no-store'
+                });
+                clearTimeout(timeoutId);
                 if (!response.ok) throw new Error('HTTP ' + response.status);
                 const data = await response.json();
-                try { sessionStorage.setItem(cacheKey, JSON.stringify(data)); } catch (e) {}
+                writeCachedStore(data);
                 applyStoreData(data);
             } catch (error) {
+                clearTimeout(timeoutId);
                 console.error('خطأ في جلب بيانات Google Sheets:', error);
-                if (!allProducts.length) {
+                if (!allProducts.length && grid) {
                     setupCategories(allProducts);
                     grid.innerHTML = `<p class="col-span-3 text-center text-neutral-400 py-12">تعذر تحميل المنتجات من المتجر. حاول تحديث الصفحة بعد قليل.</p>`;
                 }
@@ -658,26 +706,34 @@
 
         function setupCategories(products, sheetCategories = []) {
             const container = document.getElementById('categories-container');
+            if (!container) return;
             const productCats = products.map(p => String(p.category || '').trim()).filter(Boolean);
-            const merged = ['الكل'];
+            const merged = ['All'];
 
             sheetCategories.forEach(item => {
+                if (item.mode === 'hidden') return;
                 if (!merged.some(existing => existing.toLowerCase() === item.name.toLowerCase())) {
                     merged.push(item.name);
                 }
             });
 
             productCats.forEach(cat => {
+                const mode = categoryStatesMap[cat.toLowerCase()] || 'active';
+                if (mode === 'hidden') return;
                 if (!merged.some(existing => existing.toLowerCase() === cat.toLowerCase())) {
                     merged.push(cat);
                 }
             });
 
-            container.innerHTML = merged.map(cat => `
-                <button type="button" data-category="${escapeHTML(cat)}" class="category-btn relative z-20 cursor-pointer px-5 py-2 rounded-full text-xs font-semibold ${cat === 'الكل' ? 'bg-black text-white' : 'bg-white text-neutral-800 border border-neutral-300'} transition">
-                    ${escapeHTML(cat)}
-                </button>
-            `).join('');
+            const activeNorm = String(activeCategory || 'All').trim().toLowerCase();
+            container.innerHTML = merged.map(cat => {
+                const isSelected = String(cat).trim().toLowerCase() === activeNorm;
+                return `
+                    <button type="button" data-category="${escapeHTML(cat)}" class="category-btn shrink-0 whitespace-nowrap relative z-20 cursor-pointer px-4 sm:px-5 py-1.5 sm:py-2 rounded-full text-[11px] sm:text-xs font-semibold ${isSelected ? 'bg-black text-white' : 'bg-white text-neutral-800 border border-neutral-300'} transition">
+                        ${escapeHTML(cat)}
+                    </button>
+                `;
+            }).join('');
 
             container.querySelectorAll('.category-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
@@ -689,25 +745,38 @@
         }
 
         function filterCategory(category) {
-            const cleanCat = String(category ?? 'الكل').trim() || 'الكل';
+            const cleanCat = String(category ?? 'All').trim() || 'All';
+            if (cleanCat.toLowerCase() !== 'all' && categoryStatesMap[cleanCat.toLowerCase()] === 'hidden') {
+                return;
+            }
             activeCategory = cleanCat;
             const targetNorm = cleanCat.toLowerCase();
             document.querySelectorAll('.category-btn').forEach(btn => {
                 const btnVal = String(btn.dataset.category ?? btn.innerText ?? '').trim().toLowerCase();
                 const isSelected = btnVal === targetNorm;
                 btn.className = isSelected
-                    ? 'category-btn px-5 py-2 rounded-full text-xs font-semibold bg-black text-white transition'
-                    : 'category-btn px-5 py-2 rounded-full text-xs font-semibold bg-white text-neutral-800 border border-neutral-300 transition';
+                    ? 'category-btn shrink-0 whitespace-nowrap px-4 sm:px-5 py-1.5 sm:py-2 rounded-full text-[11px] sm:text-xs font-semibold bg-black text-white transition'
+                    : 'category-btn shrink-0 whitespace-nowrap px-4 sm:px-5 py-1.5 sm:py-2 rounded-full text-[11px] sm:text-xs font-semibold bg-white text-neutral-800 border border-neutral-300 transition';
             });
             filterProducts();
         }
 
         function filterProducts() {
             const searchText = (document.getElementById('search-input')?.value || '').toLowerCase().trim();
-            const selectedCat = String(activeCategory || 'الكل').trim().toLowerCase();
+            const selectedCat = String(activeCategory || 'All').trim().toLowerCase();
+
+            if (selectedCat !== 'all' && categoryStatesMap[selectedCat] === 'coming_soon' && !searchText) {
+                const grid = document.getElementById('products-grid');
+                if (grid) {
+                    grid.innerHTML = `<p class="col-span-full text-center text-neutral-500 py-14 text-sm font-semibold">هذا القسم سيتوفر قريباً</p>`;
+                }
+                return;
+            }
+
             const filtered = allProducts.filter(product => {
                 const prodCat = String(product.category || '').trim().toLowerCase();
-                const matchesCat = selectedCat === 'الكل' || prodCat === selectedCat;
+                if (categoryStatesMap[prodCat] === 'hidden') return false;
+                const matchesCat = selectedCat === 'all' || prodCat === selectedCat;
                 const matchesSearch = String(product.name || '').toLowerCase().includes(searchText)
                     || String(product.description || '').toLowerCase().includes(searchText);
                 return matchesCat && matchesSearch;
@@ -718,7 +787,11 @@
         function displayProducts(productsToDisplay) {
             const grid = document.getElementById('products-grid');
             if (productsToDisplay.length === 0) {
-                grid.innerHTML = `<p class="col-span-3 text-center text-neutral-400 py-12">لا توجد منتجات مطابقة للبحث أو القسم المختار.</p>`;
+                const selectedCat = String(activeCategory || 'All').trim().toLowerCase();
+                const msg = (selectedCat !== 'all' && categoryStatesMap[selectedCat] === 'coming_soon')
+                    ? 'هذا القسم سيتوفر قريباً'
+                    : 'لا توجد منتجات مطابقة للبحث أو القسم المختار.';
+                grid.innerHTML = `<p class="col-span-full text-center text-neutral-400 py-12">${msg}</p>`;
                 return;
             }
 
@@ -740,8 +813,8 @@
                     : `<span class="font-bold text-sm">${product.price} EGP</span>`;
 
                 return `
-                    <div data-product-card="${slideKey}" class="bg-white p-6 rounded-2xl shadow-sm border border-neutral-200/60 flex flex-col justify-between">
-                        <div class="relative w-full h-72 rounded-xl overflow-hidden mb-4 group border border-neutral-100" style="background-color: ${bgColor};">
+                    <div data-product-card="${slideKey}" class="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-neutral-200/60 flex flex-col justify-between">
+                        <div class="relative w-full h-56 sm:h-72 rounded-xl overflow-hidden mb-4 group border border-neutral-100" style="background-color: ${bgColor};">
                             ${imageHTML}
                             ${imageList.length > 1 ? `
                                 <button onclick='changeSlide(${jsLiteral(product.id)}, -1)' class="absolute left-2 top-1/2 -translate-y-1/2 bg-white/85 hover:bg-white px-2 py-1 rounded-full text-xs shadow transition">❮</button>
@@ -916,7 +989,7 @@
             if (initAllBtn) {
                 initAllBtn.addEventListener('click', (e) => {
                     e.preventDefault();
-                    filterCategory('الكل');
+                    filterCategory('All');
                 });
             }
             updateCartUI();
