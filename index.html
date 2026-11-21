@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ZILL | The Collection</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600&family=Syne:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&family=Syne:wght@400;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Cairo', sans-serif; background-color: #f4f4f4; color: #111; margin: 0; }
         .brand-font { font-family: 'Syne', sans-serif; }
@@ -22,18 +22,18 @@
             transform: translateY(0);
         }
 
+        /* نص العروض المتحرك بدون شريط أو صندوق */
         #offers-bar {
             width: 100%;
-            height: 52px;
+            height: 34px;
             overflow: hidden;
             position: relative;
-            background: #eeeeee;
-            color: #555555;
+            background-color: #f4f4f4;
+            color: #111111;
             display: none;
             white-space: nowrap;
             direction: ltr;
-            border-top: 1px solid #dddddd;
-            border-bottom: 1px solid #dddddd;
+            border-bottom: 1px solid #e5e5e5;
             z-index: 45;
         }
         #offers-track {
@@ -44,29 +44,37 @@
             height: 100%;
             white-space: nowrap;
             direction: ltr;
-            animation: zillOffersMarquee 14s linear infinite !important;
-            animation-play-state: running !important;
+            animation-timing-function: linear;
+            animation-iteration-count: infinite;
+            animation-play-state: running;
             will-change: transform;
         }
         .offer-item {
             display: inline-flex;
             align-items: center;
             flex: 0 0 auto;
-            padding: 0 42px;
-            font-size: 19px;
+            padding: 0 28px;
+            font-size: 12px;
             font-weight: 600;
             letter-spacing: .2px;
-            color: #555555;
+            color: #111111;
             white-space: nowrap;
             direction: rtl;
         }
-        .offer-dot {
-            display: inline-block;
-            margin-left: 30px;
-            font-size: 15px;
-            color: #999999;
+        @media (min-width: 640px) {
+            #offers-bar {
+                height: 36px;
+            }
+            .offer-item {
+                padding: 0 40px;
+                font-size: 13px;
+            }
         }
-        @keyframes zillOffersMarquee {
+        @keyframes zillOffersLTR {
+            from { transform: translate3d(-50%, 0, 0); }
+            to { transform: translate3d(0, 0, 0); }
+        }
+        @keyframes zillOffersRTL {
             from { transform: translate3d(0, 0, 0); }
             to { transform: translate3d(-50%, 0, 0); }
         }
@@ -136,7 +144,7 @@
             <button onclick="closeProductDetails()" class="absolute top-4 left-4 z-10 bg-white/90 rounded-full w-9 h-9 text-lg">✕</button>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 p-5 md:p-8">
                 <div>
-                    <div id="detail-main-image" class="w-full aspect-[4/5] bg-neutral-100 rounded-xl overflow-hidden"></div>
+                    <div id="detail-main-image" class="w-full aspect-[4/5] bg-white rounded-xl overflow-hidden border border-neutral-100"></div>
                     <div id="detail-thumbnails" class="flex gap-2 mt-3 overflow-x-auto"></div>
                 </div>
                 <div class="flex flex-col justify-center py-2">
@@ -158,7 +166,7 @@
     </div>
 
     <!-- نافذة تنبيه الإضافة للسلة -->
-    <div id="toast-modal" class="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs hidden flex items-center justify-center p-4">
+    <div id="toast-modal" class="fixed inset-0 z-[70] bg-black/40 backdrop-blur-sm hidden items-center justify-center p-4">
         <div class="bg-white rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl space-y-4">
             <h3 class="brand-font text-base font-bold">تمت إضافة المنتج للسلة</h3>
             <p class="text-xs text-neutral-500">اذهب للسلة لتاكيد الاوردر أو تابع التسوق.</p>
@@ -170,14 +178,14 @@
     </div>
 
     <!-- نافذة سلة الطلبات وتأكيد الشراء -->
-    <div id="cart-modal" class="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl flex flex-col max-h-[90vh]">
-            <div class="flex justify-between items-center border-b pb-4 mb-4">
+    <div id="cart-modal" class="fixed inset-0 z-[65] bg-black/50 backdrop-blur-sm hidden items-center justify-center p-3 sm:p-4" onclick="if(event.target===this) toggleCartModal()">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-xl flex flex-col max-h-[92vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b pb-3 mb-3 shrink-0">
                 <h3 class="brand-font text-lg font-bold">سلة الطلبات وتأكيد الشراء</h3>
-                <button onclick="toggleCartModal()" class="text-neutral-500 hover:text-black text-sm">✕ إغلاق</button>
+                <button onclick="toggleCartModal()" class="text-neutral-500 hover:text-black text-sm px-2 py-1">✕ إغلاق</button>
             </div>
             
-            <div id="cart-items-container" class="overflow-y-auto max-h-36 divide-y divide-neutral-100 space-y-3 mb-4"></div>
+            <div id="cart-items-container" class="shrink-0 overflow-y-auto max-h-48 min-h-[76px] bg-neutral-50/70 rounded-xl px-3 py-1 divide-y divide-neutral-200/70 mb-4 border border-neutral-100"></div>
 
             <div class="space-y-3 border-t pt-4">
                 <div>
@@ -198,8 +206,8 @@
                     </select>
                 </div>
                 <div>
-                    <label class="block text-xs text-neutral-500 mb-1">العنوان بالتفصيل</label>
-                    <textarea id="customer-address" class="w-full bg-neutral-50 border border-neutral-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-black" placeholder="المدينة، الشارع..."></textarea>
+                    <label id="address-label" class="block text-xs text-neutral-500 mb-1">أدخل عنوانك</label>
+                    <textarea id="customer-address" class="w-full bg-neutral-50 border border-neutral-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-black" placeholder="أدخل عنوانك (المدينة، الشارع...)"></textarea>
                 </div>
             </div>
 
@@ -290,6 +298,12 @@
 
         // --- السلة والطلب ---
         let cart = [];
+        try {
+            const savedCart = JSON.parse(sessionStorage.getItem('zill_cart_v1') || '[]');
+            if (Array.isArray(savedCart)) cart = savedCart;
+        } catch (e) {
+            cart = [];
+        }
         let shippingOptions = [];
 
         function addToCart(id, name, price, size) {
@@ -302,10 +316,10 @@
             }
             updateCartUI();
             closeProductDetails();
-            document.getElementById('toast-modal').classList.remove('hidden');
+            const toastModal = document.getElementById('toast-modal'); toastModal.classList.remove('hidden'); toastModal.classList.add('flex');
         }
 
-        function closeToast() { document.getElementById('toast-modal').classList.add('hidden'); }
+        function closeToast() { const toastModal = document.getElementById('toast-modal'); toastModal.classList.add('hidden'); toastModal.classList.remove('flex'); }
         function closeToastAndGoCart() { closeToast(); toggleCartModal(); }
 
         function getShippingFee() {
@@ -313,7 +327,30 @@
             return select ? (parseFloat(select.value) || 0) : 0;
         }
 
+        function updateAddressPlaceholder() {
+            const govSelect = document.getElementById('customer-governorate');
+            const addressInput = document.getElementById('customer-address');
+            const addressLabel = document.getElementById('address-label');
+
+            if (govSelect && addressInput) {
+                const selectedOption = govSelect.options[govSelect.selectedIndex];
+                const govName = (selectedOption?.dataset.governorate || selectedOption?.textContent || '').trim();
+
+                if (govName.includes('مترو')) {
+                    if (addressLabel) addressLabel.textContent = 'أدخل محطتك';
+                    addressInput.placeholder = 'أدخل محطتك (اسم محطة المترو)...';
+                } else {
+                    if (addressLabel) addressLabel.textContent = 'أدخل عنوانك';
+                    addressInput.placeholder = 'أدخل عنوانك (المدينة، الشارع...)';
+                }
+            }
+        }
+
         function updateCartUI() {
+            try {
+                sessionStorage.setItem('zill_cart_v1', JSON.stringify(cart));
+            } catch (e) {}
+            updateAddressPlaceholder();
             document.getElementById('cart-count').innerText = cart.reduce((sum, item) => sum + item.quantity, 0);
             const container = document.getElementById('cart-items-container');
 
@@ -326,13 +363,13 @@
             }
 
             const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-            container.innerHTML = cart.map(item => `
-                <div class="py-2 flex justify-between items-center text-xs">
-                    <div>
-                        <p class="font-bold">${escapeHTML(item.name)}</p>
-                        <p class="text-neutral-500">المقاس: ${escapeHTML(item.size)} · ${item.price} EGP × ${item.quantity}</p>
+            container.innerHTML = cart.map((item, index) => `
+                <div class="py-2.5 flex justify-between items-center gap-3 text-xs">
+                    <div class="min-w-0 flex-1">
+                        <p class="font-bold text-neutral-900 truncate">${escapeHTML(item.name)}</p>
+                        <p class="text-neutral-500 mt-0.5">المقاس: <span class="font-semibold text-neutral-700">${escapeHTML(item.size)}</span> · ${item.price} EGP × ${item.quantity}</p>
                     </div>
-                    <button onclick="removeFromCart('${String(item.id).replace(/'/g, "\\'")}','${String(item.size).replace(/'/g, "\\'")}')" class="text-red-500 hover:underline px-2 py-1">حذف</button>
+                    <button type="button" data-remove-index="${index}" class="text-red-500 hover:text-red-700 hover:underline shrink-0 px-2 py-1">حذف</button>
                 </div>
             `).join('');
 
@@ -352,13 +389,32 @@
             }[char]));
         }
 
-        function removeFromCart(id, size) {
-            cart = cart.filter(item => !(String(item.id) === String(id) && item.size === size));
+        function removeFromCart(idOrIndex, size) {
+            if (typeof idOrIndex === 'number' && size === undefined) {
+                cart.splice(idOrIndex, 1);
+            } else {
+                cart = cart.filter(item => !(String(item.id) === String(idOrIndex) && item.size === size));
+            }
             updateCartUI();
         }
 
+        document.addEventListener('click', (event) => {
+            const removeBtn = event.target.closest('[data-remove-index]');
+            if (removeBtn) {
+                const idx = Number(removeBtn.getAttribute('data-remove-index'));
+                if (!Number.isNaN(idx) && idx >= 0 && idx < cart.length) {
+                    cart.splice(idx, 1);
+                    updateCartUI();
+                }
+            }
+        });
+
         function toggleCartModal() {
-            document.getElementById('cart-modal').classList.toggle('hidden');
+            const modal = document.getElementById('cart-modal');
+            const willOpen = modal.classList.contains('hidden');
+            modal.classList.toggle('hidden', !willOpen);
+            modal.classList.toggle('flex', willOpen);
+            if (willOpen) updateCartUI();
         }
 
         async function confirmOrder() {
@@ -398,8 +454,6 @@
             }
 
             try {
-                // صيغة البيانات مطابقة تماماً لما يستقبله doPost في Google Apps Script.
-                // وضع no-cors يسمح بإرسال الطلب، لكن المتصفح لا يتيح قراءة رد Google Apps Script.
                 await fetch(WEB_APP_URL, {
                     method: 'POST',
                     mode: 'no-cors',
@@ -416,12 +470,12 @@
 
                 alert(`تم إرسال طلبك يا ${name}. سنتواصل معك قريباً لتأكيد الطلب.`);
                 cart = [];
-                updateCartUI();
-                document.getElementById('cart-modal').classList.add('hidden');
                 document.getElementById('customer-name').value = '';
                 document.getElementById('customer-phone').value = '';
                 document.getElementById('customer-governorate').value = '0';
                 document.getElementById('customer-address').value = '';
+                updateCartUI();
+                const cartModal = document.getElementById('cart-modal'); cartModal.classList.add('hidden'); cartModal.classList.remove('flex');
             } catch (error) {
                 console.error('Order submission error:', error);
                 alert('حصلت مشكلة في إرسال الطلب. راجع اتصال الإنترنت وحاول مرة أخرى.');
@@ -440,6 +494,11 @@
         let activeOffers = [];
         window.slideIndices = {};
 
+        function isArabicText(text) {
+            const cleaned = String(text || '').replace(/^[\s«"'(“‘\[\]✦•\-–—]+/, '');
+            return /^[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(cleaned);
+        }
+
         function renderOffersBar(offers) {
             const bar = document.getElementById('offers-bar');
             const track = document.getElementById('offers-track');
@@ -457,13 +516,27 @@
                 return;
             }
 
+            const firstText = String(validOffers[0].text || '').trim();
+            const arabicFirst = isArabicText(firstText);
+
             const items = validOffers.map(item =>
-                `<span class="offer-item"><span>${escapeHTML(String(item.text))}</span><span class="offer-dot">✦</span></span>`
+                `<span class="offer-item"><span>${escapeHTML(String(item.text))}</span></span>`
             ).join('');
 
             track.innerHTML = items + items;
             bar.style.display = 'block';
-            track.style.animationDuration = (validOffers.length === 1 ? 16 : Math.min(28, 12 + validOffers.length * 4)) + 's';
+            track.style.animationName = arabicFirst ? 'zillOffersLTR' : 'zillOffersRTL';
+            track.style.animationDuration = (validOffers.length === 1 ? 18 : Math.min(30, 14 + validOffers.length * 4)) + 's';
+        }
+
+        function sanitizeBgColor(colorValue) {
+            const raw = String(colorValue || '').trim();
+            if (!raw) return '#ffffff';
+            const withHash = /^[0-9a-fA-F]{3,8}$/.test(raw) ? '#' + raw : raw;
+            const probe = document.createElement('div');
+            probe.style.backgroundColor = '';
+            probe.style.backgroundColor = withHash;
+            return probe.style.backgroundColor ? withHash : '#ffffff';
         }
 
         function normalizeProduct(product) {
@@ -471,6 +544,12 @@
             const images = Array.isArray(imageValue)
                 ? imageValue
                 : String(imageValue).split(/[,;\n]/).map(url => url.trim()).filter(Boolean);
+
+            const rawBg = product.color_background
+                ?? product.background_color
+                ?? product.bg_color
+                ?? product.background
+                ?? '#ffffff';
 
             return {
                 id: product.id,
@@ -481,6 +560,7 @@
                 stock_alert: product.stock_alert || '',
                 category: product.category || 'Hoodies',
                 images: images.join(','),
+                bg_color: sanitizeBgColor(rawBg),
                 description: product.description || ''
             };
         }
@@ -505,7 +585,6 @@
                 if (!response.ok) throw new Error('HTTP ' + response.status);
                 const data = await response.json();
 
-                // doGet يرجع كائناً يحتوي على products و shipping، وليس مصفوفة منتجات مباشرة.
                 allProducts = (Array.isArray(data.products) ? data.products : []).map(normalizeProduct);
                 populateShipping(data.shipping);
                 setupCategories(allProducts);
@@ -523,7 +602,7 @@
             const container = document.getElementById('categories-container');
             const categories = ['الكل', ...new Set(products.map(p => p.category).filter(Boolean))];
             container.innerHTML = categories.map(cat => `
-                <button onclick="filterCategory('${String(cat).replace(/'/g, "\\'")}')" class="category-btn px-5 py-2 rounded-full text-xs font-semibold ${cat === 'الكل' ? 'bg-black text-white' : 'bg-white text-neutral-800 border border-neutral-300'} transition">
+                <button onclick="filterCategory(${jsLiteral(cat)})" class="category-btn px-5 py-2 rounded-full text-xs font-semibold ${cat === 'الكل' ? 'bg-black text-white' : 'bg-white text-neutral-800 border border-neutral-300'} transition">
                     ${escapeHTML(cat)}
                 </button>
             `).join('');
@@ -561,28 +640,35 @@
 
             grid.innerHTML = productsToDisplay.map(product => {
                 const imageList = product.images ? product.images.split(',').map(url => url.trim()).filter(Boolean) : [];
-                if (window.slideIndices[product.id] === undefined) window.slideIndices[product.id] = 0;
+                if (!window.slideIndices[product.id]) window.slideIndices[product.id] = 0;
                 const currentIndex = window.slideIndices[product.id];
+                const bgColor = escapeHTML(product.bg_color || '#ffffff');
                 const imageHTML = imageList.length
-                    ? `<img data-slide-image-id="${escapeHTML(product.id)}" src="${escapeHTML(imageList[currentIndex] || imageList[0])}" class="w-full h-full object-cover transition duration-500" alt="${escapeHTML(product.name)}">`
+                    ? `<img id="img-${escapeHTML(product.id)}" src="${escapeHTML(imageList[currentIndex] || imageList[0])}" class="w-full h-full object-contain p-2 transition duration-500" alt="${escapeHTML(product.name)}">`
                     : `<div class="w-full h-full flex items-center justify-center text-neutral-400 text-xs">الصورة غير متاحة</div>`;
+
+                const priceHTML = product.old_price > product.price
+                    ? `<div class="flex items-center gap-2">
+                           <span class="font-bold text-sm">${product.price} EGP</span>
+                           <span class="text-xs text-neutral-400 line-through">${product.old_price} EGP</span>
+                       </div>`
+                    : `<span class="font-bold text-sm">${product.price} EGP</span>`;
 
                 return `
                     <div class="bg-white p-6 rounded-2xl shadow-sm border border-neutral-200/60 flex flex-col justify-between">
-                        <div class="relative w-full h-72 bg-neutral-100 rounded-xl overflow-hidden mb-4 group">
+                        <div class="relative w-full h-72 rounded-xl overflow-hidden mb-4 group border border-neutral-100" style="background-color: ${bgColor};">
                             ${imageHTML}
                             ${imageList.length > 1 ? `
-                                <button onclick='changeSlide(${jsLiteral(product.id)}, -1)' class="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white px-2 py-1 rounded-full text-xs shadow transition">❮</button>
-                                <button onclick='changeSlide(${jsLiteral(product.id)}, 1)' class="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white px-2 py-1 rounded-full text-xs shadow transition">❯</button>
+                                <button onclick='changeSlide(${jsLiteral(product.id)}, -1)' class="absolute left-2 top-1/2 -translate-y-1/2 bg-white/85 hover:bg-white px-2 py-1 rounded-full text-xs shadow transition">❮</button>
+                                <button onclick='changeSlide(${jsLiteral(product.id)}, 1)' class="absolute right-2 top-1/2 -translate-y-1/2 bg-white/85 hover:bg-white px-2 py-1 rounded-full text-xs shadow transition">❯</button>
                             ` : ''}
                         </div>
                         <div>
                             <span class="text-[10px] uppercase tracking-widest text-neutral-400 brand-font">${escapeHTML(product.category)}</span>
                             <h3 class="brand-font text-base font-semibold mt-1">${escapeHTML(product.name)}</h3>
-                            <p class="text-xs text-neutral-500 mt-1 font-light">${escapeHTML(product.description)}</p>
                         </div>
                         <div class="flex justify-between items-center mt-6 pt-4 border-t border-neutral-100">
-                            <span class="font-bold text-sm">${product.price} EGP</span>
+                            ${priceHTML}
                             <button onclick='openProductDetails(${jsLiteral(product.id)})' class="bg-black text-white px-4 py-2 rounded-full text-xs font-semibold hover:bg-neutral-800 transition">عرض التفاصيل</button>
                         </div>
                     </div>
@@ -611,7 +697,9 @@
             selectedDetailImage = 0;
             document.getElementById('detail-category').textContent = product.category || '';
             document.getElementById('detail-name').textContent = product.name;
-            document.getElementById('detail-price').textContent = `${product.price} EGP`;
+            document.getElementById('detail-price').innerHTML = product.old_price > product.price
+                ? `${product.price} EGP <span class="text-sm font-normal text-neutral-400 line-through mr-2">${product.old_price} EGP</span>`
+                : `${product.price} EGP`;
             document.getElementById('detail-description').textContent = product.description || 'لا توجد تفاصيل إضافية لهذا المنتج حالياً.';
             renderDetailImages();
             renderDetailSizes();
@@ -632,13 +720,15 @@
             const images = getProductImages(selectedDetailProduct);
             const main = document.getElementById('detail-main-image');
             const thumbs = document.getElementById('detail-thumbnails');
+            const bgColor = escapeHTML(selectedDetailProduct?.bg_color || '#ffffff');
+            main.style.backgroundColor = bgColor;
             if (!images.length) {
                 main.innerHTML = '<div class="w-full h-full flex items-center justify-center text-neutral-400 text-xs">الصورة غير متاحة</div>';
                 thumbs.innerHTML = '';
                 return;
             }
-            main.innerHTML = `<img src="${escapeHTML(images[selectedDetailImage] || images[0])}" class="w-full h-full object-cover" alt="${escapeHTML(selectedDetailProduct.name)}">`;
-            thumbs.innerHTML = images.map((url, index) => `<button onclick="selectDetailImage(${index})" class="w-16 h-20 flex-shrink-0 rounded-lg overflow-hidden border-2 ${index === selectedDetailImage ? 'border-black' : 'border-transparent'}"><img src="${escapeHTML(url)}" class="w-full h-full object-cover"></button>`).join('');
+            main.innerHTML = `<img src="${escapeHTML(images[selectedDetailImage] || images[0])}" class="w-full h-full object-contain p-3" alt="${escapeHTML(selectedDetailProduct.name)}">`;
+            thumbs.innerHTML = images.map((url, index) => `<button onclick="selectDetailImage(${index})" class="w-16 h-20 flex-shrink-0 rounded-lg overflow-hidden border-2 ${index === selectedDetailImage ? 'border-black' : 'border-transparent'}" style="background-color: ${bgColor};"><img src="${escapeHTML(url)}" class="w-full h-full object-contain p-1"></button>`).join('');
         }
 
         function selectDetailImage(index) {
@@ -679,7 +769,11 @@
         }
 
         function addSelectedProductToCart() {
-            if (!selectedDetailProduct || !selectedDetailSize) return;
+            if (!selectedDetailProduct) return;
+            if (!selectedDetailSize) {
+                alert('من فضلك اختار المقاس الأول.');
+                return;
+            }
             addToCart(selectedDetailProduct.id, selectedDetailProduct.name, selectedDetailProduct.price, selectedDetailSize);
         }
 
@@ -692,9 +786,22 @@
             window.slideIndices[productId] += direction;
             if (window.slideIndices[productId] >= images.length) window.slideIndices[productId] = 0;
             if (window.slideIndices[productId] < 0) window.slideIndices[productId] = images.length - 1;
-            const image = document.querySelector(`[data-slide-image-id="${CSS.escape(String(productId))}"]`);
+            const image = document.getElementById(`img-${CSS.escape(String(productId))}`);
             if (image) image.src = images[window.slideIndices[productId]];
         }
+
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeToast();
+                closeProductDetails();
+                const cartModal = document.getElementById('cart-modal');
+                if (cartModal && !cartModal.classList.contains('hidden')) {
+                    cartModal.classList.add('hidden');
+                    cartModal.classList.remove('flex');
+                }
+            }
+        });
 
         window.onload = () => {
             const introSeenKey = 'zill_intro_seen_v1';
@@ -710,6 +817,7 @@
                 sessionStorage.setItem(introSeenKey, '1');
             }
 
+            updateCartUI();
             fetchProducts();
         };
     </script>
