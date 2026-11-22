@@ -263,7 +263,7 @@
         </div>
     </div>
 
-    <!-- نافذة تسجيل حساب العميل على الشيت بدون باسورد أو Google Cloud -->
+    <!-- نافذة حساب العميل -->
     <div id="account-modal" class="fixed inset-0 z-[75] bg-black/50 backdrop-blur-sm hidden items-center justify-center p-4" onclick="if(event.target===this) toggleAccountModal()">
         <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative space-y-4">
             <div class="flex justify-between items-center border-b pb-3">
@@ -273,19 +273,19 @@
 
             <div id="account-logged-out" class="space-y-3 py-1">
                 <p class="text-xs text-neutral-600 leading-6">
-                    سجّل إيميلك بدون باسورد عشان يوصلك جديد العروض والخصومات أول بأول.
+                    سجّل بريدك الإلكتروني لتصلك أحدث العروض والإصدارات الخاصة من ZILL.
                 </p>
                 <div>
-                    <label for="account-name-input" class="block text-xs text-neutral-500 mb-1">اسمك (اختياري)</label>
-                    <input type="text" id="account-name-input" class="w-full bg-neutral-50 border border-neutral-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-black" placeholder="اكتب اسمك...">
+                    <label for="account-name-input" class="block text-xs text-neutral-500 mb-1">الاسم (اختياري)</label>
+                    <input type="text" id="account-name-input" class="w-full bg-neutral-50 border border-neutral-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-black" placeholder="الاسم الكامل">
                 </div>
                 <div>
-                    <label for="account-email-input" class="block text-xs text-neutral-500 mb-1">حسابك / الإيميل (Gmail أو غيره)</label>
-                    <input type="email" id="account-email-input" dir="ltr" class="w-full bg-neutral-50 border border-neutral-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-black text-left" placeholder="name@gmail.com">
+                    <label for="account-email-input" class="block text-xs text-neutral-500 mb-1">البريد الإلكتروني</label>
+                    <input type="email" id="account-email-input" dir="ltr" class="w-full bg-neutral-50 border border-neutral-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-black text-left" placeholder="name@example.com">
                 </div>
                 <p id="account-error-msg" class="text-[11px] text-red-500 hidden"></p>
                 <button type="button" id="save-account-btn" onclick="registerSimpleAccount()" class="w-full bg-black text-white py-2.5 rounded-xl text-xs font-semibold hover:bg-neutral-800 transition">
-                    حفظ الحساب وتسجيله ✅
+                    تأكيد تسجيل الحساب
                 </button>
             </div>
 
@@ -294,9 +294,9 @@
                     <p id="account-name" class="text-sm font-bold text-neutral-900 truncate"></p>
                     <p id="account-email" class="text-xs text-neutral-600 truncate" dir="ltr"></p>
                 </div>
-                <p id="account-sync-status" class="text-[11px] text-emerald-700 font-semibold"></p>
+                <p id="account-sync-status" class="text-[11px] text-emerald-700 font-semibold leading-5"></p>
                 <button type="button" onclick="signOutGoogleAccount()" class="w-full border border-neutral-300 text-neutral-700 hover:border-black hover:text-black py-2.5 rounded-xl text-xs font-semibold transition">
-                    تغيير الحساب / خروج
+                    تسجيل الخروج
                 </button>
             </div>
         </div>
@@ -371,16 +371,65 @@
             startIntroSequence();
         }
 
-        // --- حساب العميل المباشر على Google Sheets (بدون باسورد أو Google Cloud) ---
-        const CUSTOMER_STORAGE_KEY = 'zill_simple_customer_v1';
+        // --- حساب العميل ---
+        const CUSTOMER_STORAGE_KEY = 'zill_customer_account_v2';
+        const REGISTERED_EMAILS_KEY = 'zill_registered_emails_v1';
         let currentCustomer = null;
 
-        try {
-            const savedCust = JSON.parse(sessionStorage.getItem(CUSTOMER_STORAGE_KEY) || localStorage.getItem(CUSTOMER_STORAGE_KEY) || 'null');
-            if (savedCust && savedCust.email) currentCustomer = savedCust;
-        } catch (e) {
-            currentCustomer = null;
+        function loadSavedCustomer() {
+            try {
+                const raw = localStorage.getItem(CUSTOMER_STORAGE_KEY) || sessionStorage.getItem(CUSTOMER_STORAGE_KEY);
+                if (!raw) return null;
+                const parsed = JSON.parse(raw);
+                if (parsed && parsed.email) {
+                    return {
+                        name: String(parsed.name || '').trim(),
+                        email: String(parsed.email || '').trim().toLowerCase()
+                    };
+                }
+            } catch (e) {}
+            return null;
         }
+
+        function persistCustomer(customer) {
+            try {
+                if (customer && customer.email) {
+                    const serialized = JSON.stringify({
+                        name: String(customer.name || '').trim(),
+                        email: String(customer.email || '').trim().toLowerCase()
+                    });
+                    localStorage.setItem(CUSTOMER_STORAGE_KEY, serialized);
+                    sessionStorage.setItem(CUSTOMER_STORAGE_KEY, serialized);
+                } else {
+                    localStorage.removeItem(CUSTOMER_STORAGE_KEY);
+                    sessionStorage.removeItem(CUSTOMER_STORAGE_KEY);
+                }
+            } catch (e) {}
+        }
+
+        function getRegisteredEmailsList() {
+            try {
+                const raw = localStorage.getItem(REGISTERED_EMAILS_KEY);
+                const arr = raw ? JSON.parse(raw) : [];
+                return Array.isArray(arr) ? arr.map(e => String(e || '').trim().toLowerCase()).filter(Boolean) : [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function markEmailAsRegistered(email) {
+            const clean = String(email || '').trim().toLowerCase();
+            if (!clean) return;
+            const list = getRegisteredEmailsList();
+            if (!list.includes(clean)) {
+                list.push(clean);
+                try {
+                    localStorage.setItem(REGISTERED_EMAILS_KEY, JSON.stringify(list));
+                } catch (e) {}
+            }
+        }
+
+        currentCustomer = loadSavedCustomer();
 
         function updateAccountUI(syncMessage = '') {
             const btnLabel = document.getElementById('account-btn-label');
@@ -397,7 +446,7 @@
                 if (nameEl) nameEl.textContent = currentCustomer.name || 'عميل ZILL';
                 if (emailEl) emailEl.textContent = currentCustomer.email;
                 if (statusEl) {
-                    statusEl.textContent = syncMessage || 'تم تسجيل حسابك في الشيت لاستقبال العروض ✅';
+                    statusEl.textContent = syncMessage || 'تم تسجيل حسابك بنجاح، ستصلك أحدث العروض على بريدك الإلكتروني.';
                 }
 
                 const custNameInput = document.getElementById('customer-name');
@@ -444,7 +493,7 @@
 
             if (!email || !email.includes('@') || !email.includes('.')) {
                 if (errEl) {
-                    errEl.textContent = 'من فضلك اكتب إيميل صحيح (مثال: name@gmail.com).';
+                    errEl.textContent = 'يرجى إدخال بريد إلكتروني صحيح.';
                     errEl.classList.remove('hidden');
                 }
                 emailInput?.focus();
@@ -452,37 +501,39 @@
             }
 
             if (errEl) errEl.classList.add('hidden');
+
+            const alreadyRegistered = getRegisteredEmailsList().includes(email)
+                || (currentCustomer && currentCustomer.email && currentCustomer.email.toLowerCase() === email);
+
             if (saveBtn) {
                 saveBtn.disabled = true;
-                saveBtn.textContent = 'جاري الحفظ في الشيت...';
+                saveBtn.textContent = 'جاري التأكيد...';
             }
 
             currentCustomer = {
-                name: name,
+                name: name || (currentCustomer && currentCustomer.email === email ? currentCustomer.name : ''),
                 email: email
             };
 
-            try {
-                const serialized = JSON.stringify(currentCustomer);
-                sessionStorage.setItem(CUSTOMER_STORAGE_KEY, serialized);
-                localStorage.setItem(CUSTOMER_STORAGE_KEY, serialized);
-            } catch (e) {}
-
+            persistCustomer(currentCustomer);
+            markEmailAsRegistered(email);
             await saveCustomerToSheet(currentCustomer);
-            updateAccountUI('تم تسجيل حسابك في شيت Customers بنجاح ✅');
+
+            if (alreadyRegistered) {
+                updateAccountUI('هذا البريد الإلكتروني مسجل مسبقاً لدينا، وتم تحديث بيانات دخولك.');
+            } else {
+                updateAccountUI('تم تسجيل بريدك الإلكتروني بنجاح، ستصلك أحدث العروض قريباً.');
+            }
 
             if (saveBtn) {
                 saveBtn.disabled = false;
-                saveBtn.textContent = 'حفظ الحساب وتسجيله ✅';
+                saveBtn.textContent = 'تأكيد تسجيل الحساب';
             }
         }
 
         function signOutGoogleAccount() {
             currentCustomer = null;
-            try {
-                sessionStorage.removeItem(CUSTOMER_STORAGE_KEY);
-                localStorage.removeItem(CUSTOMER_STORAGE_KEY);
-            } catch (e) {}
+            persistCustomer(null);
             const emailInput = document.getElementById('account-email-input');
             const nameInput = document.getElementById('account-name-input');
             if (emailInput) emailInput.value = '';
@@ -499,6 +550,7 @@
             if (willOpen) {
                 const errEl = document.getElementById('account-error-msg');
                 if (errEl) errEl.classList.add('hidden');
+                currentCustomer = loadSavedCustomer() || currentCustomer;
                 updateAccountUI();
             }
         }
